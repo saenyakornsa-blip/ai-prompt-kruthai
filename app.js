@@ -44,6 +44,7 @@ function initSupabase() {
     try {
       _sb = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
       console.log('[Supabase] Client initialised');
+      setupAuthListeners();
     } catch (err) { console.warn('[Supabase] init failed:', err); }
     return;
   }
@@ -53,9 +54,20 @@ function initSupabase() {
     try {
       _sb = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
       console.log('[Supabase] Client initialised (dynamic)');
+      setupAuthListeners();
     } catch (err) { console.warn('[Supabase] dynamic init failed:', err); }
   };
   document.head.appendChild(script);
+}
+
+function setupAuthListeners() {
+  if (!_sb) return;
+  _sb.auth.getSession().then(async ({ data: { session } }) => {
+    if (session?.user) await onAuthStateChanged(session.user);
+  });
+  _sb.auth.onAuthStateChange(async (_event, session) => {
+    await onAuthStateChanged(session?.user || null);
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -766,38 +778,99 @@ async function sharePrompt() {
    15. AUTH FUNCTIONS (SUPABASE)
 ═══════════════════════════════════════════════════════════════ */
 async function signIn() {
-  if (!_sb) { showToast('ระบบล็อกอินยังไม่พร้อมใช้งาน', 'error'); return; }
+  if (!_sb) { showToast('ระบบล็อกอินยังไม่พร้อมใช้งาน (กำลังเชื่อมต่อ Supabase...)', 'error'); return; }
 
   const email    = document.getElementById('login-email')?.value?.trim();
   const password = document.getElementById('login-password')?.value;
-  if (!email || !password) { showToast('กรุณากรอกอีเมลและรหัสผ่าน', 'error'); return; }
+  const errEl    = document.getElementById('login-error');
+  if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
 
-  const { data, error } = await _sb.auth.signInWithPassword({ email, password });
-  if (error) { showToast('ล็อกอินไม่สำเร็จ: ' + error.message, 'error'); return; }
+  if (!email || !password) {
+    const msg = 'กรุณากรอกอีเมลและรหัสผ่าน';
+    if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+    showToast(msg, 'error');
+    return;
+  }
 
-  state.user = data.user;
-  closeAuthModal(null, true);
-  showToast('ล็อกอินสำเร็จ! ยินดีต้อนรับ 🎉', 'success');
-  await onAuthStateChanged(data.user);
+  const btn = document.querySelector('#auth-login .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ...'; }
+
+  try {
+    const { data, error } = await _sb.auth.signInWithPassword({ email, password });
+    if (btn) { btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ'; }
+
+    if (error) {
+      let msg = error.message;
+      if (msg.includes('Invalid login credentials')) {
+        msg = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง หรือยังไม่ได้สมัครสมาชิก';
+      }
+      if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+      showToast(msg, 'error');
+      return;
+    }
+
+    state.user = data.user;
+    closeAuthModal(null, true);
+    showToast('เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับ 🎉', 'success');
+    await onAuthStateChanged(data.user);
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ'; }
+    showToast('เกิดข้อผิดพลาด: ' + (err.message || err), 'error');
+  }
 }
 
 async function signUp() {
-  if (!_sb) { showToast('ระบบสมัครสมาชิกยังไม่พร้อมใช้งาน', 'error'); return; }
+  if (!_sb) { showToast('ระบบสมัครสมาชิกยังไม่พร้อมใช้งาน (กำลังเชื่อมต่อ Supabase...)', 'error'); return; }
 
   const email    = document.getElementById('signup-email')?.value?.trim();
   const password = document.getElementById('signup-password')?.value;
-  const name     = document.getElementById('signup-name')?.value?.trim();
-  if (!email || !password) { showToast('กรุณากรอกข้อมูลให้ครบ', 'error'); return; }
+  const name     = document.getElementById('signup-name')?.value?.trim() || '';
+  const errEl    = document.getElementById('signup-error');
+  if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
 
-  const { data, error } = await _sb.auth.signUp({
-    email, password,
-    options: { data: { display_name: name } }
-  });
-  if (error) { showToast('สมัครสมาชิกไม่สำเร็จ: ' + error.message, 'error'); return; }
+  if (!email || !password) {
+    const msg = 'กรุณากรอกอีเมลและรหัสผ่านให้ครบถ้วน';
+    if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+    showToast(msg, 'error');
+    return;
+  }
 
-  state.user = data.user;
-  closeAuthModal(null, true);
-  showToast('สมัครสมาชิกสำเร็จ! ตรวจสอบอีเมลเพื่อยืนยัน', 'success');
+  if (password.length < 6) {
+    const msg = 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร';
+    if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+    showToast(msg, 'error');
+    return;
+  }
+
+  const btn = document.querySelector('#auth-signup .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'กำลังสมัครสมาชิก...'; }
+
+  try {
+    const { data, error } = await _sb.auth.signUp({
+      email, password,
+      options: { data: { display_name: name } }
+    });
+    if (btn) { btn.disabled = false; btn.textContent = 'สมัครสมาชิก'; }
+
+    if (error) {
+      if (errEl) { errEl.textContent = error.message; errEl.classList.remove('hidden'); }
+      showToast('สมัครสมาชิกไม่สำเร็จ: ' + error.message, 'error');
+      return;
+    }
+
+    if (data?.session) {
+      state.user = data.user;
+      closeAuthModal(null, true);
+      showToast('สมัครสมาชิกและเข้าสู่ระบบสำเร็จ 🎉', 'success');
+      await onAuthStateChanged(data.user);
+    } else {
+      closeAuthModal(null, true);
+      showToast('สมัครสำเร็จ! โปรดตรวจสอบอีเมลของคุณเพื่อยืนยันการสมัคร', 'success');
+    }
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'สมัครสมาชิก'; }
+    showToast('เกิดข้อผิดพลาด: ' + (err.message || err), 'error');
+  }
 }
 
 async function signInWithGoogle() {
@@ -806,7 +879,7 @@ async function signInWithGoogle() {
     provider: 'google',
     options:  { redirectTo: window.location.href }
   });
-  if (error) showToast('ล็อกอินด้วย Google ไม่สำเร็จ', 'error');
+  if (error) showToast('ล็อกอินด้วย Google ไม่สำเร็จ: ' + error.message, 'error');
 }
 
 async function signOut() {
@@ -847,8 +920,24 @@ function closeAuthModal(event, force = false) {
 
 function switchAuthPanel(panel) {
   ['login', 'signup', 'reset'].forEach(p => {
-    const el = document.getElementById(`auth-panel-${p}`);
-    if (el) el.classList.toggle('hidden', p !== panel);
+    const el = document.getElementById(`auth-${p}`);
+    if (el) {
+      if (p === panel) {
+        el.classList.add('active');
+        el.classList.remove('hidden');
+        el.style.display = 'block';
+      } else {
+        el.classList.remove('active');
+        el.classList.add('hidden');
+        el.style.display = 'none';
+      }
+    }
+  });
+
+  // Clear errors
+  ['login-error', 'signup-error', 'reset-msg'].forEach(id => {
+    const errEl = document.getElementById(id);
+    if (errEl) { errEl.textContent = ''; errEl.classList.add('hidden'); }
   });
 }
 
