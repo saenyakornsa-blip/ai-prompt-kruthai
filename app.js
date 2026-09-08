@@ -959,18 +959,58 @@ async function onAuthStateChanged(user) {
 }
 
 function updateProfileUI(user) {
-  const loginBtn  = document.getElementById('login-btn');
-  const logoutBtn = document.getElementById('logout-btn');
-  const userName  = document.getElementById('profile-username');
+  const loginBtn        = document.getElementById('login-btn');
+  const userAvatarWrap  = document.getElementById('user-avatar-wrap');
+  const avatarInitials  = document.getElementById('avatar-initials');
+  const dropdownName    = document.getElementById('dropdown-name');
+  const dropdownEmail   = document.getElementById('dropdown-email');
+  const logoutBtn       = document.getElementById('logout-btn');
+  const userName        = document.getElementById('profile-username');
 
-  if (loginBtn)  loginBtn.classList.toggle('hidden', !!user);
-  if (logoutBtn) logoutBtn.classList.toggle('hidden', !user);
-  if (userName) {
-    userName.textContent = user
-      ? (user.user_metadata?.display_name || user.email || 'ผู้ใช้')
-      : 'ล็อกอินเพื่อซิงค์ข้อมูล';
+  if (user) {
+    // Logged in: Hide login button, show avatar
+    if (loginBtn) loginBtn.classList.add('hidden');
+    if (userAvatarWrap) userAvatarWrap.classList.remove('hidden');
+
+    const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'ผู้ใช้';
+    const email = user.email || '';
+
+    // Initials: First Thai or English character
+    const initial = displayName.trim().charAt(0).toUpperCase() || '👤';
+    if (avatarInitials) avatarInitials.textContent = initial;
+    if (dropdownName) dropdownName.textContent = displayName;
+    if (dropdownEmail) dropdownEmail.textContent = email;
+    if (userName) userName.textContent = displayName;
+    if (logoutBtn) logoutBtn.classList.remove('hidden');
+  } else {
+    // Logged out: Show login button, hide avatar
+    if (loginBtn) loginBtn.classList.remove('hidden');
+    if (userAvatarWrap) {
+      userAvatarWrap.classList.add('hidden');
+      const dropdown = document.getElementById('user-dropdown');
+      if (dropdown) dropdown.classList.add('hidden');
+    }
+    if (userName) userName.textContent = 'ล็อกอินเพื่อซิงค์ข้อมูล';
+    if (logoutBtn) logoutBtn.classList.add('hidden');
   }
 }
+
+function toggleUserDropdown(event) {
+  if (event) event.stopPropagation();
+  const dropdown = document.getElementById('user-dropdown');
+  if (dropdown) dropdown.classList.toggle('hidden');
+}
+
+// Close user dropdown when clicking outside
+document.addEventListener('click', (e) => {
+  const userMenu = document.getElementById('user-menu');
+  const dropdown = document.getElementById('user-dropdown');
+  if (dropdown && !dropdown.classList.contains('hidden')) {
+    if (!userMenu || !userMenu.contains(e.target)) {
+      dropdown.classList.add('hidden');
+    }
+  }
+});
 
 /* ═══════════════════════════════════════════════════════════════
    16. TOAST NOTIFICATIONS

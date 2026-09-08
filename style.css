@@ -1,4 +1,4 @@
-﻿/* ================================================================
+/* ================================================================
    AI Prompt ครูไทย — style.css
    Mobile-first responsive design with Sarabun font
 ================================================================ */
@@ -213,16 +213,22 @@ body {
 .btn-login:hover { background: var(--primary-hover); }
 .user-menu { position: relative; }
 .avatar-btn {
-  width: 36px; height: 36px;
+  width: 38px; height: 38px;
   border-radius: 50%;
-  background: var(--primary);
-  border: none;
+  background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.avatar-initials { color: #fff; font-weight: 700; font-size: 14px; font-family: var(--font); }
+.avatar-btn:hover {
+  transform: scale(1.06);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.45);
+}
+.avatar-initials { color: #fff; font-weight: 700; font-size: 15px; font-family: var(--font); }
 .user-dropdown {
   position: absolute;
   top: calc(100% + 8px);
@@ -230,22 +236,31 @@ body {
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  min-width: 200px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+  min-width: 220px;
   z-index: 200;
   overflow: hidden;
+  animation: dropdownIn 0.15s ease;
+}
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .dropdown-header {
   padding: 14px 16px;
   background: var(--primary-light);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
-.dropdown-header span:first-child { font-weight: 700; font-size: 15px; }
-.user-dropdown hr { border: none; border-top: 1px solid var(--border); }
+body.dark-mode .dropdown-header { background: #1E1B4B; }
+.dropdown-header span:first-child { font-weight: 700; font-size: 15px; color: var(--text); }
+.dropdown-header span.text-muted { font-size: 12px; color: var(--text-muted); word-break: break-all; }
+.user-dropdown hr { border: none; border-top: 1px solid var(--border); margin: 0; }
 .user-dropdown button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   padding: 10px 16px;
   background: none;
@@ -258,7 +273,9 @@ body {
   transition: background var(--transition);
 }
 .user-dropdown button:hover { background: var(--bg); }
-.user-dropdown button.danger { color: var(--book3); }
+.user-dropdown button.danger { color: #DC2626; }
+.user-dropdown button.danger:hover { background: #FEF2F2; }
+body.dark-mode .user-dropdown button.danger:hover { background: rgba(220, 38, 38, 0.15); }
 
 /* ─── LAYOUT ─────────────────────────── */
 .app-layout {
