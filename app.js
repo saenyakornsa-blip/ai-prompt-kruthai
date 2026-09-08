@@ -1,0 +1,1337 @@
+/**
+ * AI Prompt ครูไทย — Main Application
+ * app.js
+ *
+ * Globals expected:
+ *   PROMPTS_DATA    – array of prompt objects (from data/prompts.js)
+ *   BOOKS_META      – array of book metadata
+ *   CHAPTERS_META   – array of chapter metadata
+ *   SUPABASE_CONFIG – { url, anonKey, enabled }
+ *   SITE_CONFIG     – { promptsPerPage, maxSearchSuggestions }
+ */
+
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════
+   1. APP STATE
+═══════════════════════════════════════════════════════════════ */
+const state = {
+  currentView:      'home',
+  filteredPrompts:  [],
+  currentPage:      1,
+  viewMode:         'grid',   // 'grid' | 'list'
+  activeBook:       null,
+  activeChapter:    null,
+  activeSituation:  'all',
+  activeTag:        null,
+  searchQuery:      '',
+  isMasterOnly:     false,
+  currentPrompt:    null,
+  user:             null,
+  favorites:        new Set(),
+  copyHistory:      [],
+  sortMode:         'default'
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   2. SUPABASE INIT
+═══════════════════════════════════════════════════════════════ */
+let _sb = null;
+
+function initSupabase() {
+  if (!SUPABASE_CONFIG.enabled) return;
+  if (window.supabase) {
+    try {
+      _sb = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+      console.log('[Supabase] Client initialised');
+    } catch (err) { console.warn('[Supabase] init failed:', err); }
+    return;
+  }
+  var script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+  script.onload = function() {
+    try {
+      _sb = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+      console.log('[Supabase] Client initialised (dynamic)');
+    } catch (err) { console.warn('[Supabase] dynamic init failed:', err); }
+  };
+  document.head.appendChild(script);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   3. NAVIGATION
+═══════════════════════════════════════════════════════════════ */
+const VIEWS = ['home', 'favorites', 'dashboard', 'map', 'profile'];
+
+function navigateTo(view) {
+  if (!VIEWS.includes(view)) return;
+  state.currentView = view;
+
+  VIEWS.forEach(v => {
+    const el = document.getElementById(`view-${v}`);
+    if (el) if (v === view) {
+      el.style.display = 'block';
+      el.classList.add('active');
+    } else {
+      el.style.display = 'none';
+      el.classList.remove('active');
+    }
+  });
+
+  updateNavActive(view);
+
+  if (view === 'favorites')  renderFavoritesView();
+  if (view === 'dashboard')  loadDashboard();
+  if (view === 'map')        renderLegalMap();
+}
+
+function updateNavActive(view) {
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    el.classList.toggle('active', el.dataset.nav === view);
+  });
+  document.querySelectorAll('[data-bottom-nav]').forEach(el => {
+    el.classList.toggle('active', el.dataset.bottomNav === view);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   4. SEARCH
+═══════════════════════════════════════════════════════════════ */
+let _searchTimer = null;
+
+function onSearchInput(query) {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => {
+    state.searchQuery = query.trim();
+    state.currentPage = 1;
+    applySortAndFilter();
+    renderSuggestions(query.trim());
+    toggleClearButton(query.trim().length > 0);
+  }, 300);
+}
+
+function toggleClearButton(show) {
+  document.querySelectorAll('.search-clear').forEach(btn => {
+    btn.classList.toggle('hidden', !show);
+  });
+}
+
+function clearSearch() {
+  state.searchQuery = '';
+  document.querySelectorAll('.search-input-field').forEach(el => { el.value = ''; });
+  toggleClearButton(false);
+  hideSuggestions();
+  state.currentPage = 1;
+  applySortAndFilter();
+}
+
+function renderSuggestions(query) {
+  const container = document.getElementById('search-suggestions');
+  if (!container || !query) { hideSuggestions(); return; }
+
+  const max = (SITE_CONFIG && SITE_CONFIG.maxSearchSuggestions) || 8;
+  const lower = query.toLowerCase();
+  const matches = PROMPTS_DATA
+    .filter(p =>
+      p.title.toLowerCase().includes(lower) ||
+      (p.promptNum && p.promptNum.includes(lower))
+    )
+    .slice(0, max);
+
+  if (matches.length === 0) { hideSuggestions(); return; }
+
+  container.innerHTML = matches.map(p => `
+    <div class="suggestion-item" onclick="selectSuggestion('${p.id}')">
+      <span class="suggestion-num">${p.promptNum}</span>
+      <span class="suggestion-title">${highlightText(p.title, query)}</span>
+    </div>
+  `).join('');
+  container.classList.remove('hidden');
+}
+
+function hideSuggestions() {
+  const c = document.getElementById('search-suggestions');
+  if (c) c.classList.add('hidden');
+}
+
+function selectSuggestion(promptId) {
+  hideSuggestions();
+  openPromptModal(promptId);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   5. FILTERING
+═══════════════════════════════════════════════════════════════ */
+function filterByBook(bookNum) {
+  state.activeBook    = bookNum;
+  state.activeChapter = null;
+  state.currentPage   = 1;
+  updateSidebarActive();
+  applySortAndFilter();
+}
+
+function filterByChapter(bookNum, chapterNum) {
+  state.activeBook    = bookNum;
+  state.activeChapter = chapterNum;
+  state.currentPage   = 1;
+  updateSidebarActive();
+  applySortAndFilter();
+}
+
+function filterBySituation(situation) {
+  state.activeSituation = situation;
+  state.currentPage     = 1;
+  document.querySelectorAll('[data-situation]').forEach(el => {
+    el.classList.toggle('active', el.dataset.situation === situation);
+  });
+  applySortAndFilter();
+}
+
+function filterByTag(tag) {
+  state.activeTag   = (state.activeTag === tag) ? null : tag;
+  state.currentPage = 1;
+  renderTagsBar();
+  applySortAndFilter();
+}
+
+function filterMaster() {
+  state.isMasterOnly = !state.isMasterOnly;
+  state.currentPage  = 1;
+  const btn = document.getElementById('master-filter-btn');
+  if (btn) btn.classList.toggle('active', state.isMasterOnly);
+  applySortAndFilter();
+}
+
+// Toggle chapter sub-menu expand/collapse in sidebar
+function toggleBook(bookNum) {
+  const chapters = document.getElementById('chapters-' + bookNum);
+  const chevron  = document.querySelector('[data-book="' + bookNum + '"] .chevron');
+
+  if (!chapters) {
+    filterByBook(bookNum);
+    return;
+  }
+
+  const isOpen = chapters.style.display !== 'none' && chapters.style.display !== '';
+
+  // Close all other chapter menus first
+  [1, 2, 3].forEach(function(b) {
+    const ch = document.getElementById('chapters-' + b);
+    const cv = document.querySelector('[data-book="' + b + '"] .chevron');
+    if (ch) ch.style.display = 'none';
+    if (cv) cv.textContent = '▸';
+  });
+
+  if (!isOpen) {
+    chapters.style.display = 'block';
+    if (chevron) chevron.textContent = '▾';
+    filterByBook(bookNum);
+  } else {
+    filterByBook(null);
+  }
+}
+
+// Highlight active item in sidebar
+function updateSidebarActive() {
+  // Highlight "ทั้งหมด"
+  document.querySelectorAll('[data-filter="all"]').forEach(function(el) {
+    el.classList.toggle('active', state.activeBook === null && state.activeChapter === null);
+  });
+  // Highlight active book header
+  [1, 2, 3].forEach(function(b) {
+    const header = document.querySelector('[data-book="' + b + '"] .nav-book-header');
+    if (header) header.classList.toggle('active', state.activeBook === b);
+  });
+  // Highlight active chapter button
+  document.querySelectorAll('.nav-chapter').forEach(function(btn) {
+    btn.classList.remove('active');
+  });
+}
+
+function applySortAndFilter() {
+  let prompts = [...PROMPTS_DATA];
+
+  // Book filter
+  if (state.activeBook !== null) {
+    prompts = prompts.filter(p => p.book === state.activeBook);
+  }
+
+  // Chapter filter
+  if (state.activeChapter !== null) {
+    prompts = prompts.filter(p => p.chapter === state.activeChapter);
+  }
+
+  // Situation filter
+  if (state.activeSituation && state.activeSituation !== 'all') {
+    prompts = prompts.filter(p =>
+      Array.isArray(p.situations) && p.situations.includes(state.activeSituation)
+    );
+  }
+
+  // Tag filter
+  if (state.activeTag) {
+    prompts = prompts.filter(p =>
+      Array.isArray(p.tags) && p.tags.includes(state.activeTag)
+    );
+  }
+
+  // Master-only filter
+  if (state.isMasterOnly) {
+    prompts = prompts.filter(p => p.isMaster);
+  }
+
+  // Search query
+  if (state.searchQuery) {
+    const lower = state.searchQuery.toLowerCase();
+    prompts = prompts.filter(p =>
+      (p.title   && p.title.toLowerCase().includes(lower)) ||
+      (p.content && p.content.toLowerCase().includes(lower)) ||
+      (Array.isArray(p.tags) && p.tags.some(t => t.toLowerCase().includes(lower))) ||
+      (p.promptNum && p.promptNum.includes(lower))
+    );
+  }
+
+  // Sort
+  prompts = sortPrompts(prompts);
+
+  state.filteredPrompts = prompts;
+
+  // Render
+  const perPage = (SITE_CONFIG && SITE_CONFIG.promptsPerPage) || 12;
+  const start   = (state.currentPage - 1) * perPage;
+  const page    = prompts.slice(start, start + perPage);
+
+  renderPrompts(page);
+  renderPagination(prompts.length, perPage, state.currentPage);
+  updateResultCount(prompts.length);
+}
+
+function updateResultCount(total) {
+  const el = document.getElementById('result-count');
+  if (el) el.textContent = `${total} prompt${total === 1 ? '' : 's'}`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   6. SORTING
+═══════════════════════════════════════════════════════════════ */
+function sortPrompts(prompts) {
+  switch (state.sortMode) {
+    case 'az':
+      return [...prompts].sort((a, b) => a.title.localeCompare(b.title, 'th'));
+
+    case 'popular': {
+      const stats = getCopyStats();
+      return [...prompts].sort((a, b) => (stats[b.id] || 0) - (stats[a.id] || 0));
+    }
+
+    default: // 'default'
+      return [...prompts].sort((a, b) => {
+        if (a.book !== b.book) return a.book - b.book;
+        if (a.chapter !== b.chapter) return a.chapter - b.chapter;
+        return (a.promptNum || '').localeCompare(b.promptNum || '', undefined, { numeric: true });
+      });
+  }
+}
+
+function setSortMode(mode) {
+  state.sortMode    = mode;
+  state.currentPage = 1;
+  document.querySelectorAll('[data-sort]').forEach(el => {
+    el.classList.toggle('active', el.dataset.sort === mode);
+  });
+  applySortAndFilter();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   7. PROMPT CARDS RENDERING
+═══════════════════════════════════════════════════════════════ */
+function renderPrompts(prompts) {
+  const grid = document.getElementById('prompts-grid');
+  if (!grid) return;
+
+  if (prompts.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <p class="empty-text">ไม่พบ Prompt ที่ตรงกัน</p>
+        <button class="btn-secondary" onclick="clearSearch()">ล้างการค้นหา</button>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = prompts.map(p => buildCardHTML(p)).join('');
+}
+
+function buildCardHTML(p) {
+  const favClass  = state.favorites.has(p.id) ? 'favorited' : '';
+  const favStar   = state.favorites.has(p.id) ? '★' : '☆';
+  const masterBadge = p.isMaster
+    ? '<span class="master-badge">MASTER</span>'
+    : '';
+  const tags = (p.tags || []).slice(0, 3)
+    .map(t => `<span class="tag">${t}</span>`).join('');
+
+  return `
+    <div class="prompt-card book-${p.book}" data-id="${p.id}" onclick="openPromptModal('${p.id}')">
+      <div class="card-header">
+        <span class="card-book-badge book${p.book}">เล่ม ${p.book}</span>
+        <span class="card-num">${p.promptNum}</span>
+        ${masterBadge}
+      </div>
+      <h3 class="card-title">${highlightText(p.title, state.searchQuery)}</h3>
+      <p class="card-preview">${highlightText(truncate(p.content || '', 120), state.searchQuery)}</p>
+      <div class="card-tags">${tags}</div>
+      <div class="card-footer">
+        <button class="btn-copy" onclick="event.stopPropagation(); copyPrompt('${p.id}')">
+          📋 คัดลอก
+        </button>
+        <button class="btn-favorite ${favClass}"
+                onclick="event.stopPropagation(); toggleFavorite('${p.id}')"
+                title="บันทึกรายการโปรด">
+          ${favStar}
+        </button>
+      </div>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   8. PAGINATION
+═══════════════════════════════════════════════════════════════ */
+function renderPagination(total, perPage, currentPage) {
+  const container = document.getElementById('pagination');
+  if (!container) return;
+
+  const totalPages = Math.ceil(total / perPage);
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+  const pages = buildPageNumbers(currentPage, totalPages);
+
+  container.innerHTML = pages.map(p => {
+    if (p === '...') return `<span class="page-ellipsis">…</span>`;
+    return `<button class="page-btn ${p === currentPage ? 'active' : ''}"
+                    onclick="goToPage(${p})">${p}</button>`;
+  }).join('');
+
+  // Prev / Next
+  const prevDisabled = currentPage <= 1 ? 'disabled' : '';
+  const nextDisabled = currentPage >= totalPages ? 'disabled' : '';
+  container.insertAdjacentHTML('afterbegin',
+    `<button class="page-btn page-prev" onclick="goToPage(${currentPage - 1})" ${prevDisabled}>‹</button>`);
+  container.insertAdjacentHTML('beforeend',
+    `<button class="page-btn page-next" onclick="goToPage(${currentPage + 1})" ${nextDisabled}>›</button>`);
+}
+
+function buildPageNumbers(current, total, maxVisible = 7) {
+  if (total <= maxVisible) return Array.from({ length: total }, (_, i) => i + 1);
+
+  const pages = [];
+  const half  = Math.floor(maxVisible / 2);
+  let start   = Math.max(2, current - half);
+  let end     = Math.min(total - 1, current + half);
+
+  if (current - half <= 2)       end   = Math.min(total - 1, maxVisible - 2);
+  if (current + half >= total-1) start = Math.max(2, total - maxVisible + 2);
+
+  pages.push(1);
+  if (start > 2)    pages.push('...');
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < total - 1) pages.push('...');
+  pages.push(total);
+
+  return pages;
+}
+
+function goToPage(page) {
+  const perPage    = (SITE_CONFIG && SITE_CONFIG.promptsPerPage) || 12;
+  const totalPages = Math.ceil(state.filteredPrompts.length / perPage);
+  if (page < 1 || page > totalPages) return;
+  state.currentPage = page;
+  const start = (page - 1) * perPage;
+  const slice = state.filteredPrompts.slice(start, start + perPage);
+  renderPrompts(slice);
+  renderPagination(state.filteredPrompts.length, perPage, page);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   9. COPY PROMPT
+═══════════════════════════════════════════════════════════════ */
+async function copyPrompt(promptId) {
+  const p = PROMPTS_DATA.find(x => x.id === promptId);
+  if (!p) return;
+
+  // Access check — MODE B/C gates copy action
+  if (typeof checkCopyAccess === 'function') {
+    checkCopyAccess(promptId, () => _doCopyPrompt(p));
+    return;
+  }
+  await _doCopyPrompt(p);
+}
+
+async function _doCopyPrompt(p) {
+  const promptId = p.id;
+
+  try {
+    await navigator.clipboard.writeText(p.content);
+  } catch {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = p.content;
+    ta.style.position = 'fixed';
+    ta.style.opacity  = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+
+  // Visual feedback on all copy buttons for this prompt
+  document.querySelectorAll('.btn-copy[data-id="' + promptId + '"], .btn-copy-modal').forEach(btn => {
+    const original = btn.textContent;
+    btn.textContent = '✅ คัดลอกแล้ว!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+
+  // Log to localStorage
+  logCopyEvent(promptId);
+
+  // Log to Supabase
+  if (_sb && state.user) {
+    _sb.from('copy_events').insert({
+      prompt_id: promptId,
+      user_id:   state.user.id,
+      created_at: new Date().toISOString()
+    }).then(({ error }) => {
+      if (error) console.warn('[Supabase] copy_events insert error:', error);
+    });
+  }
+
+  showToast('คัดลอก Prompt แล้ว! วางใน Claude, ChatGPT หรือ Gemini ได้เลย', 'success');
+  if (typeof updateAccessIndicator === 'function') updateAccessIndicator();
+}
+
+function logCopyEvent(promptId) {
+  try {
+    const key   = 'ai_prompt_kruthai_copy_stats';
+    const stats = JSON.parse(localStorage.getItem(key) || '{}');
+    stats[promptId] = (stats[promptId] || 0) + 1;
+    localStorage.setItem(key, JSON.stringify(stats));
+
+    // Also keep a history array (last 50)
+    const histKey = 'ai_prompt_kruthai_copy_history';
+    const hist    = JSON.parse(localStorage.getItem(histKey) || '[]');
+    hist.unshift({ id: promptId, ts: Date.now() });
+    localStorage.setItem(histKey, JSON.stringify(hist.slice(0, 50)));
+    state.copyHistory = hist;
+  } catch (err) {
+    console.warn('[LocalStorage] logCopyEvent error:', err);
+  }
+}
+
+function getCopyStats() {
+  try {
+    return JSON.parse(localStorage.getItem('ai_prompt_kruthai_copy_stats') || '{}');
+  } catch { return {}; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   10. FAVORITES
+═══════════════════════════════════════════════════════════════ */
+async function toggleFavorite(promptId) {
+  if (state.favorites.has(promptId)) {
+    state.favorites.delete(promptId);
+    showToast('นำออกจากรายการโปรดแล้ว', 'info');
+
+    if (_sb && state.user) {
+      const { error } = await _sb
+        .from('favorites')
+        .delete()
+        .eq('user_id', state.user.id)
+        .eq('prompt_id', promptId);
+      if (error) console.warn('[Supabase] delete favorite error:', error);
+    }
+  } else {
+    state.favorites.add(promptId);
+    showToast('บันทึกเป็นรายการโปรดแล้ว ★', 'success');
+
+    if (_sb && state.user) {
+      const { error } = await _sb
+        .from('favorites')
+        .upsert({ user_id: state.user.id, prompt_id: promptId, created_at: new Date().toISOString() });
+      if (error) console.warn('[Supabase] insert favorite error:', error);
+    }
+  }
+
+  // Persist locally as fallback
+  try {
+    localStorage.setItem('ai_prompt_kruthai_favs', JSON.stringify([...state.favorites]));
+  } catch (err) {
+    console.warn('[LocalStorage] save favorites error:', err);
+  }
+
+  updateFavCount();
+  refreshFavButtons(promptId);
+}
+
+function refreshFavButtons(promptId) {
+  const isFav = state.favorites.has(promptId);
+  document.querySelectorAll(`.btn-favorite[data-id="${promptId}"]`).forEach(btn => {
+    btn.textContent = isFav ? '★' : '☆';
+    btn.classList.toggle('favorited', isFav);
+  });
+  // Re-render modal fav button if open
+  if (state.currentPrompt && state.currentPrompt.id === promptId) {
+    const modalFavBtn = document.getElementById('modal-fav-btn');
+    if (modalFavBtn) {
+      modalFavBtn.textContent = isFav ? '★ รายการโปรด' : '☆ บันทึก';
+      modalFavBtn.classList.toggle('favorited', isFav);
+    }
+  }
+}
+
+async function loadFavoritesFromSupabase() {
+  if (!_sb || !state.user) return;
+  try {
+    const { data, error } = await _sb
+      .from('favorites')
+      .select('prompt_id')
+      .eq('user_id', state.user.id);
+    if (error) throw error;
+    data.forEach(row => state.favorites.add(row.prompt_id));
+    updateFavCount();
+  } catch (err) {
+    console.warn('[Supabase] loadFavorites error:', err);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   11. PROMPT MODAL
+═══════════════════════════════════════════════════════════════ */
+function openPromptModal(promptId) {
+  const p = PROMPTS_DATA.find(x => x.id === promptId);
+  if (!p) return;
+  state.currentPrompt = p;
+
+  // Fill fields
+  setModalField('modal-prompt-num',   p.promptNum);
+  setModalField('modal-title', p.title);
+  setModalField('modal-book-badge',   `เล่ม ${p.book}`);
+
+  // Content with formatting
+  const contentEl = document.getElementById('modal-content');
+  if (contentEl) contentEl.innerHTML = formatPromptContent(p.content || '');
+
+  // Tip
+  const tipEl = document.getElementById('modal-tip-text');
+  if (tipEl) {
+    if (p.tip) {
+      tipEl.innerHTML = p.tip;
+      document.getElementById('modal-tip-section')?.classList.remove('hidden');
+    } else {
+      document.getElementById('modal-tip-section')?.classList.add('hidden');
+    }
+  }
+
+  // Customize chips
+  const customizeEl = document.getElementById('modal-customize-chips');
+  if (customizeEl) {
+    if (p.customize) {
+      const chips = p.customize.split(',').map(c => c.trim()).filter(Boolean)
+        .map(c => `<span class="customize-chip">${c}</span>`).join('');
+      customizeEl.innerHTML = chips;
+      document.getElementById('modal-customize-section')?.classList.remove('hidden');
+    } else {
+      document.getElementById('modal-customize-section')?.classList.add('hidden');
+    }
+  }
+
+  // Tags
+  const tagsEl = document.getElementById('modal-tags-na');
+  if (tagsEl) {
+    tagsEl.innerHTML = (p.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
+  }
+
+  // Situations
+  const sitEl = document.getElementById('modal-situations-na');
+  if (sitEl) {
+    sitEl.innerHTML = (p.situations || []).map(s => `<span class="situation-badge">${s}</span>`).join('');
+  }
+
+  // Master badge visibility
+  const masterBadge = document.getElementById('modal-book-badge_master_na');
+  if (masterBadge) masterBadge.classList.toggle('hidden', !p.isMaster);
+
+  // Favorite button
+  const favBtn = document.getElementById('modal-fav-btn');
+  if (favBtn) {
+    const isFav = state.favorites.has(p.id);
+    favBtn.textContent = isFav ? '★ รายการโปรด' : '☆ บันทึก';
+    favBtn.classList.toggle('favorited', isFav);
+  }
+
+  // Show overlay
+  const overlay = document.getElementById('prompt-modal-overlay');
+  if (overlay) overlay.classList.remove('hidden');
+
+  // Update URL hash for deep-linking
+  history.pushState(null, '', `#${p.id}`);
+}
+
+function closePromptModal(event) {
+  const overlay = document.getElementById('prompt-modal-overlay');
+  if (!overlay) return;
+  // Close only if clicking the backdrop itself (not the inner modal)
+  if (event && event.target !== overlay) return;
+  overlay.classList.add('hidden');
+  history.pushState('', document.title, window.location.pathname);
+  state.currentPrompt = null;
+}
+
+function closePromptModalForce() {
+  const overlay = document.getElementById('prompt-modal-overlay');
+  if (overlay) overlay.classList.add('hidden');
+  history.pushState('', document.title, window.location.pathname);
+  state.currentPrompt = null;
+}
+
+function setModalField(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   12. FORMAT PROMPT CONTENT
+═══════════════════════════════════════════════════════════════ */
+function formatPromptContent(text) {
+  // Escape HTML first to prevent XSS
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  // Highlight [placeholders] in orange/amber
+  const highlighted = escaped.replace(/\[([^\]]+)\]/g,
+    '<span class="placeholder">[$1]</span>');
+
+  // Convert newlines to <br>
+  return highlighted.replace(/\n/g, '<br>');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   13. OPEN IN AI
+═══════════════════════════════════════════════════════════════ */
+function openInAI(service) {
+  const p = state.currentPrompt;
+  if (!p) return;
+  const encoded = encodeURIComponent(p.content || '');
+  const urls = {
+    claude:  `https://claude.ai/new?q=${encoded}`,
+    chatgpt: `https://chat.openai.com/?q=${encoded}`,
+    gemini:  `https://gemini.google.com/app?q=${encoded}`
+  };
+  const url = urls[service];
+  if (url) window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   14. SHARE PROMPT
+═══════════════════════════════════════════════════════════════ */
+async function sharePrompt() {
+  const p = state.currentPrompt;
+  if (!p) return;
+  const url = `${window.location.origin}${window.location.pathname}#${p.id}`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: p.title, url });
+    } catch (err) {
+      if (err.name !== 'AbortError') console.warn('[Share] error:', err);
+    }
+  } else {
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast('คัดลอก URL แล้ว', 'success');
+    } catch {
+      showToast('ไม่สามารถคัดลอก URL ได้', 'error');
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   15. AUTH FUNCTIONS (SUPABASE)
+═══════════════════════════════════════════════════════════════ */
+async function signIn() {
+  if (!_sb) { showToast('ระบบล็อกอินยังไม่พร้อมใช้งาน', 'error'); return; }
+
+  const email    = document.getElementById('login-email')?.value?.trim();
+  const password = document.getElementById('login-password')?.value;
+  if (!email || !password) { showToast('กรุณากรอกอีเมลและรหัสผ่าน', 'error'); return; }
+
+  const { data, error } = await _sb.auth.signInWithPassword({ email, password });
+  if (error) { showToast('ล็อกอินไม่สำเร็จ: ' + error.message, 'error'); return; }
+
+  state.user = data.user;
+  closeAuthModal(null, true);
+  showToast('ล็อกอินสำเร็จ! ยินดีต้อนรับ 🎉', 'success');
+  await onAuthStateChanged(data.user);
+}
+
+async function signUp() {
+  if (!_sb) { showToast('ระบบสมัครสมาชิกยังไม่พร้อมใช้งาน', 'error'); return; }
+
+  const email    = document.getElementById('signup-email')?.value?.trim();
+  const password = document.getElementById('signup-password')?.value;
+  const name     = document.getElementById('signup-name')?.value?.trim();
+  if (!email || !password) { showToast('กรุณากรอกข้อมูลให้ครบ', 'error'); return; }
+
+  const { data, error } = await _sb.auth.signUp({
+    email, password,
+    options: { data: { display_name: name } }
+  });
+  if (error) { showToast('สมัครสมาชิกไม่สำเร็จ: ' + error.message, 'error'); return; }
+
+  state.user = data.user;
+  closeAuthModal(null, true);
+  showToast('สมัครสมาชิกสำเร็จ! ตรวจสอบอีเมลเพื่อยืนยัน', 'success');
+}
+
+async function signInWithGoogle() {
+  if (!_sb) { showToast('ระบบล็อกอินยังไม่พร้อมใช้งาน', 'error'); return; }
+  const { error } = await _sb.auth.signInWithOAuth({
+    provider: 'google',
+    options:  { redirectTo: window.location.href }
+  });
+  if (error) showToast('ล็อกอินด้วย Google ไม่สำเร็จ', 'error');
+}
+
+async function signOut() {
+  if (_sb) {
+    const { error } = await _sb.auth.signOut();
+    if (error) console.warn('[Supabase] signOut error:', error);
+  }
+  state.user = null;
+  updateProfileUI(null);
+  showToast('ออกจากระบบแล้ว', 'info');
+}
+
+async function resetPassword() {
+  if (!_sb) return;
+  const email = document.getElementById('reset-email')?.value?.trim();
+  if (!email) { showToast('กรุณากรอกอีเมล', 'error'); return; }
+
+  const { error } = await _sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.href
+  });
+  if (error) { showToast('เกิดข้อผิดพลาด: ' + error.message, 'error'); return; }
+  showToast('ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลแล้ว', 'success');
+  switchAuthPanel('login');
+}
+
+function openAuthModal(panel = 'login') {
+  const overlay = document.getElementById('auth-modal-overlay');
+  if (overlay) overlay.classList.remove('hidden');
+  switchAuthPanel(panel);
+}
+
+function closeAuthModal(event, force = false) {
+  const overlay = document.getElementById('auth-modal-overlay');
+  if (!overlay) return;
+  if (!force && event && event.target !== overlay) return;
+  overlay.classList.add('hidden');
+}
+
+function switchAuthPanel(panel) {
+  ['login', 'signup', 'reset'].forEach(p => {
+    const el = document.getElementById(`auth-panel-${p}`);
+    if (el) el.classList.toggle('hidden', p !== panel);
+  });
+}
+
+async function onAuthStateChanged(user) {
+  state.user = user;
+  updateProfileUI(user);
+  if (user) {
+    // Logged in — remove access walls
+    if (typeof onUserLoggedIn === 'function') onUserLoggedIn(user);
+    await loadFavoritesFromSupabase();
+    applySortAndFilter();
+    // Update bottom nav profile button
+    const bnProfile = document.getElementById('bn-profile');
+    if (bnProfile) bnProfile.onclick = function() { navigateTo('profile'); };
+  } else {
+    // Logged out — re-enforce access rules
+    if (typeof initAccessSystem === 'function') initAccessSystem();
+  }
+}
+
+function updateProfileUI(user) {
+  const loginBtn  = document.getElementById('login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+  const userName  = document.getElementById('profile-username');
+
+  if (loginBtn)  loginBtn.classList.toggle('hidden', !!user);
+  if (logoutBtn) logoutBtn.classList.toggle('hidden', !user);
+  if (userName) {
+    userName.textContent = user
+      ? (user.user_metadata?.display_name || user.email || 'ผู้ใช้')
+      : 'ล็อกอินเพื่อซิงค์ข้อมูล';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   16. TOAST NOTIFICATIONS
+═══════════════════════════════════════════════════════════════ */
+function showToast(message, type = 'success') {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.style.cssText =
+      'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
+      'z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;';
+    document.body.appendChild(container);
+  }
+
+  const colors = {
+    success: '#059669',
+    error:   '#dc2626',
+    info:    '#2563eb'
+  };
+
+  const toast = document.createElement('div');
+  toast.style.cssText =
+    `background:${colors[type] || colors.success};color:#fff;padding:10px 20px;` +
+    'border-radius:8px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.2);' +
+    'animation:toastIn 0.3s ease;max-width:90vw;text-align:center;pointer-events:auto;';
+  toast.textContent = message;
+  container.appendChild(toast);
+
+  // Ensure keyframes exist
+  if (!document.getElementById('toast-keyframes')) {
+    const style = document.createElement('style');
+    style.id = 'toast-keyframes';
+    style.textContent =
+      '@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}' +
+      '@keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateY(10px)}}';
+    document.head.appendChild(style);
+  }
+
+  setTimeout(() => {
+    toast.style.animation = 'toastOut 0.3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   17. DARK MODE
+═══════════════════════════════════════════════════════════════ */
+function toggleTheme() {
+  document.body.classList.toggle('dark-mode');
+  const isDark = document.body.classList.contains('dark-mode');
+  try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch {}
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+}
+
+function loadTheme() {
+  try {
+    const saved = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (saved === 'dark' || (!saved && prefersDark)) {
+      document.body.classList.add('dark-mode');
+      const btn = document.getElementById('theme-toggle');
+      if (btn) btn.textContent = '☀️';
+    }
+  } catch {}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   18. LEGAL MAP RENDERING
+═══════════════════════════════════════════════════════════════ */
+function renderLegalMap() {
+  const container = document.getElementById('legal-map-table');
+  if (!container) return;
+
+  const rows = [
+    { duty: 'ด้านที่ 1: การจัดการเรียนรู้',                         b1: true,  b2: true,  b3: false },
+    { duty: 'ด้านที่ 2: สนับสนุนการเรียนรู้',                        b1: true,  b2: false, b3: false },
+    { duty: 'ด้านที่ 3: พัฒนาตนเองและวิชาชีพ',                       b1: false, b2: false, b3: true  },
+    { duty: 'ด้านที่ 4: PLC ชุมชนการเรียนรู้ทางวิชาชีพ',             b1: false, b2: false, b3: true  },
+    { duty: 'หมวด 4 ม.22–28: กระบวนการเรียนรู้',                     b1: true,  b2: true,  b3: false },
+    { duty: 'ม.26: วัดและประเมินตามสภาพจริง',                         b1: false, b2: true,  b3: false },
+    { duty: 'ม.53: สิทธิพัฒนาทางวิชาชีพ',                           b1: false, b2: false, b3: true  },
+    { duty: 'มาตรฐานวิชาชีพ ด้าน 2',                                 b1: true,  b2: true,  b3: false },
+    { duty: 'มาตรฐานวิชาชีพ ด้าน 3 จรรยาบรรณ',                       b1: false, b2: false, b3: true  },
+  ];
+
+  const check = (val) => val
+    ? '<td class="map-check yes" title="ครอบคลุม">✅</td>'
+    : '<td class="map-check no"  title="ไม่ครอบคลุม">—</td>';
+
+  const headerColors = ['#059669', '#2563eb', '#d97706'];
+
+  container.innerHTML = `
+    <table class="legal-map-tbl">
+      <thead>
+        <tr>
+          <th class="map-duty-col">กฎหมาย / มาตรฐาน</th>
+          ${headerColors.map((c, i) => `<th style="color:${c}">เล่ม ${i+1}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr>
+            <td class="map-duty">${r.duty}</td>
+            ${check(r.b1)}
+            ${check(r.b2)}
+            ${check(r.b3)}
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   19. TAGS BAR
+═══════════════════════════════════════════════════════════════ */
+function renderTagsBar() {
+  const container = document.getElementById('tags-bar');
+  if (!container) return;
+
+  // Count tag frequency
+  const freq = {};
+  PROMPTS_DATA.forEach(p => {
+    (p.tags || []).forEach(t => { freq[t] = (freq[t] || 0) + 1; });
+  });
+
+  const top = Object.entries(freq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([tag]) => tag);
+
+  container.innerHTML = [
+    `<button class="tag-chip ${!state.activeTag ? 'active' : ''}" onclick="filterByTag(null)">ทั้งหมด</button>`,
+    ...top.map(t =>
+      `<button class="tag-chip ${state.activeTag === t ? 'active' : ''}"
+               onclick="filterByTag('${t}')">${t}</button>`
+    )
+  ].join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   20. SIDEBAR BOOK TOGGLE
+═══════════════════════════════════════════════════════════════ */
+function toggleBook(bookNum) {
+  const chapters = document.getElementById(`chapters-${bookNum}`);
+  const chevron  = document.getElementById(`chevron-${bookNum}`);
+  if (!chapters) return;
+  const isHidden = chapters.classList.toggle('hidden');
+  if (chevron) chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(90deg)';
+}
+
+function updateSidebarActive() {
+  document.querySelectorAll('.sidebar-book-item').forEach(el => {
+    el.classList.toggle('active', Number(el.dataset.book) === state.activeBook);
+  });
+  document.querySelectorAll('.sidebar-chapter-item').forEach(el => {
+    el.classList.toggle('active',
+      Number(el.dataset.book) === state.activeBook &&
+      Number(el.dataset.chapter) === state.activeChapter
+    );
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   21. DASHBOARD
+═══════════════════════════════════════════════════════════════ */
+async function loadDashboard() {
+  const guestEl = document.getElementById('dashboard-guest');
+  const userEl  = document.getElementById('dashboard-user');
+
+  if (!state.user) {
+    guestEl?.classList.remove('hidden');
+    userEl?.classList.add('hidden');
+    return;
+  }
+
+  guestEl?.classList.add('hidden');
+  userEl?.classList.remove('hidden');
+
+  // Stats from localStorage
+  const stats       = getCopyStats();
+  const totalCopies = Object.values(stats).reduce((s, v) => s + v, 0);
+  const booksUsed   = new Set(
+    Object.keys(stats)
+      .map(id => PROMPTS_DATA.find(p => p.id === id)?.book)
+      .filter(Boolean)
+  ).size;
+
+  setDashboardStat('dash-total-copies',  totalCopies);
+  setDashboardStat('dash-total-favs',    state.favorites.size);
+  setDashboardStat('dash-books-used',    booksUsed);
+
+  // Top 5 prompts
+  const top5 = Object.entries(stats)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([id, count]) => {
+      const p = PROMPTS_DATA.find(x => x.id === id);
+      return p ? { ...p, count } : null;
+    })
+    .filter(Boolean);
+
+  const listEl = document.getElementById('dash-top-prompts');
+  if (listEl) {
+    listEl.innerHTML = top5.length
+      ? top5.map(p => `
+          <div class="dash-prompt-row" onclick="openPromptModal('${p.id}')">
+            <span class="dash-prompt-num">${p.promptNum}</span>
+            <span class="dash-prompt-title">${p.title}</span>
+            <span class="dash-prompt-count">${p.count}×</span>
+          </div>`).join('')
+      : '<p class="empty-text">ยังไม่มีข้อมูลการใช้งาน</p>';
+  }
+}
+
+function setDashboardStat(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   22. FAVORITES VIEW
+═══════════════════════════════════════════════════════════════ */
+function renderFavoritesView() {
+  const emptyEl = document.getElementById('fav-empty');
+  const gridEl  = document.getElementById('fav-grid');
+  const favPrompts = PROMPTS_DATA.filter(p => state.favorites.has(p.id));
+
+  if (favPrompts.length === 0) {
+    emptyEl?.classList.remove('hidden');
+    if (gridEl) gridEl.innerHTML = '';
+  } else {
+    emptyEl?.classList.add('hidden');
+    renderToGrid(favPrompts, 'fav-grid');
+  }
+}
+
+function renderToGrid(prompts, gridId) {
+  const el = document.getElementById(gridId);
+  if (!el) return;
+  el.innerHTML = prompts.map(p => buildCardHTML(p)).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   23. APP INIT
+═══════════════════════════════════════════════════════════════ */
+async function init() {
+  // 1. Load theme
+  loadTheme();
+
+  // 2. Load favorites from localStorage
+  try {
+    const saved = localStorage.getItem('ai_prompt_kruthai_favs');
+    if (saved) JSON.parse(saved).forEach(id => state.favorites.add(id));
+  } catch {}
+
+  // 3. Load copy history from localStorage
+  try {
+    const hist = localStorage.getItem('ai_prompt_kruthai_copy_history');
+    if (hist) state.copyHistory = JSON.parse(hist);
+  } catch {}
+
+  // 4. Init Supabase
+  initSupabase();
+
+  // 5. Check auth state
+  if (_sb) {
+    _sb.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) await onAuthStateChanged(session.user);
+    });
+
+    _sb.auth.onAuthStateChange(async (_event, session) => {
+      await onAuthStateChanged(session?.user || null);
+    });
+  }
+
+  // 6. Initial render
+  applySortAndFilter();
+  renderTagsBar();
+  updateFavCount();
+
+  // 7a. Init access control system
+  if (typeof initAccessSystem === 'function') {
+    initAccessSystem();
+    updateAccessIndicator();
+  }
+
+  // 7. Set up event listeners
+  setupEventListeners();
+
+  // 8. Check URL hash for deep-link
+  if (window.location.hash) {
+    const promptId = window.location.hash.slice(1);
+    if (PROMPTS_DATA.find(p => p.id === promptId)) {
+      setTimeout(() => openPromptModal(promptId), 100);
+    }
+  }
+
+  console.log('[App] Initialised —', PROMPTS_DATA.length, 'prompts loaded');
+}
+
+function setupEventListeners() {
+  // Desktop search
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', e => onSearchInput(e.target.value));
+    searchInput.addEventListener('keydown', e => {
+      if (e.key === 'Escape') clearSearch();
+    });
+  }
+
+  // Mobile search
+  const mobileInput = document.getElementById('mobile-search-input');
+  if (mobileInput) {
+    mobileInput.addEventListener('input', e => {
+      onSearchInput(e.target.value);
+      // Sync desktop input
+      if (searchInput) searchInput.value = e.target.value;
+    });
+    mobileInput.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeMobileSearch();
+    });
+  }
+
+  // Close modal on Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closePromptModalForce();
+      closeAuthModal(null, true);
+      closeMobileSearch();
+    }
+  });
+
+  // Close suggestions when clicking outside
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#search-suggestions') && !e.target.closest('#search-input')) {
+      hideSuggestions();
+    }
+  });
+
+  // Browser back/forward for hash-based deep links
+  window.addEventListener('hashchange', () => {
+    const promptId = window.location.hash.slice(1);
+    if (promptId && PROMPTS_DATA.find(p => p.id === promptId)) {
+      openPromptModal(promptId);
+    } else {
+      closePromptModalForce();
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+/* ═══════════════════════════════════════════════════════════════
+   24. MOBILE SEARCH
+═══════════════════════════════════════════════════════════════ */
+function openMobileSearch() {
+  const overlay = document.getElementById('mobile-search-overlay');
+  if (overlay) overlay.classList.remove('hidden');
+  const input = document.getElementById('mobile-search-input');
+  if (input) {
+    // Sync value from desktop
+    const desktop = document.getElementById('search-input');
+    if (desktop) input.value = desktop.value;
+    setTimeout(() => input.focus(), 100);
+  }
+}
+
+function closeMobileSearch() {
+  const overlay = document.getElementById('mobile-search-overlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   25. COPY FROM MODAL
+═══════════════════════════════════════════════════════════════ */
+async function copyPromptFromModal() {
+  if (!state.currentPrompt) return;
+
+  await copyPrompt(state.currentPrompt.id);
+
+  const btn = document.getElementById('modal-copy-btn');
+  if (btn) {
+    const original = btn.textContent;
+    btn.textContent = '✅ คัดลอกแล้ว!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 2000);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   26. HELPER FUNCTIONS
+═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Truncate text to maxLen characters, appending '...' if truncated.
+ */
+function truncate(text, maxLen) {
+  if (!text) return '';
+  return text.length <= maxLen ? text : text.slice(0, maxLen) + '…';
+}
+
+/**
+ * Wrap query matches in <mark> tags.
+ * Returns original text if query is empty.
+ */
+function highlightText(text, query) {
+  if (!query || !text) return text || '';
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex   = new RegExp(`(${escaped})`, 'gi');
+  return text.replace(regex, '<mark>$1</mark>');
+}
+
+/**
+ * Update the favorites count badge in the navigation.
+ */
+function updateFavCount() {
+  const count = state.favorites.size;
+  document.querySelectorAll('#fav-count, .fav-count-badge').forEach(el => {
+    el.textContent = count > 0 ? count : '';
+    el.classList.toggle('hidden', count === 0);
+  });
+}
+
+/**
+ * Switch between grid and list view.
+ * @param {'grid'|'list'} mode
+ */
+function setView(mode) {
+  state.viewMode = mode;
+  const grid = document.getElementById('prompts-grid');
+  if (grid) grid.classList.toggle('list-view', mode === 'list');
+
+  document.querySelectorAll('[data-view]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === mode);
+  });
+}
+
+/**
+ * Update the active state on both top nav and bottom nav items.
+ * (Also called internally by navigateTo.)
+ */
+function updateNavActive(view) {
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    el.classList.toggle('active', el.dataset.nav === view);
+  });
+  document.querySelectorAll('[data-bottom-nav]').forEach(el => {
+    el.classList.toggle('active', el.dataset.bottomNav === view);
+  });
+}

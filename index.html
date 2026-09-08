@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="คลัง AI Prompt สำหรับครูไทย — 325+ Prompts ครบทุกงาน สอน วัดผล เอกสาร" />
+  <title>AI Prompt ครูไทย</title>
+  <!-- Google Fonts — async (ไม่ block render ถ้า offline) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Kanit:wght@600;700;800&display=swap"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Kanit:wght@600;700;800&display=swap" />
+  </noscript>
+  <!-- Supabase: loaded dynamically by app.js when config is set -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="light-mode">
+
+<header id="main-header">
+  <div class="header-inner">
+    <a href="#" class="logo" onclick="navigateTo('home');return false;">
+      <span class="logo-icon">📚</span>
+      <div class="logo-text">
+        <span class="logo-title">AI Prompt</span>
+        <span class="logo-sub">ครูไทย</span>
+      </div>
+    </a>
+    <div class="search-wrap" id="header-search-wrap">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" placeholder="ค้นหา Prompt ตามสถานการณ์... เช่น ออกข้อสอบ, แผนการสอน" autocomplete="off" />
+        <button class="search-clear" id="search-clear" title="ล้าง">✕</button>
+      </div>
+      <div id="search-suggestions" class="search-suggestions hidden"></div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-icon" id="theme-toggle" title="เปลี่ยนธีม" aria-label="Toggle dark mode">🌙</button>
+      <button class="btn-icon" id="favorites-btn" title="รายการโปรด" onclick="navigateTo('favorites')">
+        ⭐ <span class="badge" id="fav-count">0</span>
+      </button>
+      <div class="user-menu" id="user-menu">
+        <button class="btn-login" id="login-btn" onclick="openAuthModal('login')">เข้าสู่ระบบ</button>
+        <div class="user-avatar hidden" id="user-avatar-wrap">
+          <button class="avatar-btn" id="avatar-btn" onclick="toggleUserDropdown()">
+            <span class="avatar-initials" id="avatar-initials">ก</span>
+          </button>
+          <div class="user-dropdown hidden" id="user-dropdown">
+            <div class="dropdown-header">
+              <span id="dropdown-name">ผู้ใช้</span>
+              <span id="dropdown-email" class="text-muted"></span>
+            </div>
+            <hr/>
+            <button onclick="navigateTo('dashboard')">📊 สถิติของฉัน</button>
+            <button onclick="navigateTo('favorites')">⭐ รายการโปรด</button>
+            <button onclick="navigateTo('profile')">👤 โปรไฟล์</button>
+            <hr/>
+            <button onclick="signOut()" class="danger">ออกจากระบบ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <nav class="sidebar-nav">
+      <h3 class="nav-section-label">เล่มและบท</h3>
+      <button class="nav-item active" data-filter="all" onclick="filterByBook(null)">
+        <span>📚</span> ทั้งหมด <span class="chip" id="total-count">325+</span>
+      </button>
+      <div class="nav-book" data-book="1">
+        <button class="nav-item nav-book-header" onclick="toggleBook(1)">
+          <span>📗</span>
+          <span class="nav-book-label">เล่ม 1 — ลดงานสอน</span>
+          <span class="chip green">100</span>
+          <span class="chevron">▸</span>
+        </button>
+        <div class="nav-chapters" id="chapters-1" style="display:none">
+          <button class="nav-chapter" onclick="filterByChapter(1,1)">บทที่ 1: รู้จัก AI <span class="chip">10</span></button>
+          <button class="nav-chapter" onclick="filterByChapter(1,2)">บทที่ 2: ออกแบบแผนฯ <span class="chip">30</span></button>
+          <button class="nav-chapter" onclick="filterByChapter(1,3)">บทที่ 3: สร้างสื่อ <span class="chip">25</span></button>
+          <button class="nav-chapter" onclick="filterByChapter(1,4)">บทที่ 4: Active Learning <span class="chip">25</span></button>
+          <button class="nav-chapter" onclick="filterByChapter(1,5)">บทที่ 5: สื่อดิจิทัล <span class="chip">20</span></button>
+        </div>
+      </div>
+      <div class="nav-book" data-book="2">
+        <button class="nav-item nav-book-header" onclick="toggleBook(2)">
+          <span>📘</span>
+          <span class="nav-book-label">เล่ม 2 — วัดผล</span>
+          <span class="chip blue">110</span>
+          <span class="chevron">▸</span>
+        </button>
+        <div class="nav-chapters" id="chapters-2" style="display:none">
+          <button class="nav-chapter" onclick="filterByChapter(2,1)">บทที่ 1: Bloom's Taxonomy <span class="chip">10</span></button>
+          <button class="nav-chapter" onclick="filterByChapter(2,2)">บทที่ 2: ออกข้อสอบ HOTS <span class="chip">35</span></button>
+          <button class="nav-chapter" onclick="filterByChapter(2,3)">บทที่ 3: Rubric <span class="chip">30</span></button>
+          <button class="nav-chapter" onclick="filterByChapter(2,4)">บทที่ 4: วิเคราะห์คะแนน <span class="chip">25</span></button>
+          <button class="nav-chapter" onclick="filterByChapter(2,5)">บทที่ 5: ซ่อมเสริม <span class="chip">20</span></button>
+        </div>
+      </div>
+      <div class="nav-book" data-book="3">
+        <button class="nav-item nav-book-header" onclick="toggleBook(3)">
+          <span>📙</span>
+          <span class="nav-book-label">เล่ม 3 — เอกสาร</span>
+          <span class="chip red">115</span>
+          <span class="chevron">▸</span>
+        </button>
+        <div class="nav-chapters" id="chapters-3" style="display:none">
+          <button class="nav-chapter" onclick="filterByChapter(3,1)">บทที่ 1: หนังสือราชการ <span class="chip">20</span></button>
+          <button class="nav-chapter" onclick="filterByChapter(3,2)">บทที่ 2: รายงานโครงการ <span class="chip">15</span></button>
+          <button class="nav-chapter" onclick="filterByChapter(3,3)">บทที่ 3: วิจัย CAR <span class="chip">30</span></button>
+          <button class="nav-chapter" onclick="filterByChapter(3,4)">บทที่ 4: วPA <span class="chip">20</span></button>
+          <button class="nav-chapter" onclick="filterByChapter(3,5)">บทที่ 5: SAR <span class="chip">15</span></button>
+          <button class="nav-chapter" onclick="filterByChapter(3,6)">บทที่ 6: Portfolio &amp; PLC <span class="chip">15</span></button>
+        </div>
+      </div>
+      <hr class="sidebar-divider" />
+      <h3 class="nav-section-label">เข้าถึงด่วน</h3>
+      <button class="nav-item" onclick="navigateTo('map')">⚖️ Mapping กฎหมาย</button>
+      <button class="nav-item" onclick="filterMaster()">⭐ Master Prompts</button>
+      <button class="nav-item" onclick="navigateTo('dashboard')">📊 สถิติการใช้งาน</button>
+    </nav>
+  </aside>
+
+  <main class="main-content" id="main-content">
+    <div id="view-home" class="view active">
+      <section class="hero">
+        <div class="hero-stats">
+          <div class="stat-card"><div class="stat-num">325+</div><div class="stat-label">Prompts</div></div>
+          <div class="stat-card"><div class="stat-num">3</div><div class="stat-label">เล่ม</div></div>
+          <div class="stat-card"><div class="stat-num">19</div><div class="stat-label">บท/หมวด</div></div>
+          <div class="stat-card"><div class="stat-num">5</div><div class="stat-label">กฎหมายอ้างอิง</div></div>
+        </div>
+        <div class="situation-bar">
+          <span class="situation-label">🎯 เลือกตามสถานการณ์:</span>
+          <button class="situation-btn active" onclick="filterBySituation('all')">ทั้งหมด</button>
+          <button class="situation-btn green" onclick="filterBySituation('สอน')">📗 งานสอน</button>
+          <button class="situation-btn blue" onclick="filterBySituation('วัดผล')">📘 วัดผล</button>
+          <button class="situation-btn red" onclick="filterBySituation('เอกสาร')">📙 เอกสาร</button>
+        </div>
+        <div class="tags-bar" id="tags-bar"></div>
+      </section>
+      <div class="filter-bar">
+        <div class="filter-left">
+          <span class="result-count" id="result-count">แสดงทั้งหมด <strong>325</strong> Prompts</span>
+        </div>
+        <div class="filter-right">
+          <label class="sort-label">เรียงตาม:</label>
+          <select id="sort-select" onchange="applySortAndFilter()">
+            <option value="default">ค่าเริ่มต้น</option>
+            <option value="az">ชื่อ A-Z</option>
+            <option value="popular">ยอดนิยม</option>
+          </select>
+          <button class="view-toggle" id="view-grid-btn" onclick="setView('grid')" title="กริด">⊞</button>
+          <button class="view-toggle" id="view-list-btn" onclick="setView('list')" title="รายการ">☰</button>
+        </div>
+      </div>
+      <div class="prompts-grid" id="prompts-grid">
+        <div class="loading-spinner" id="loading-spinner">
+          <div class="spinner"></div>
+          <p>กำลังโหลด Prompts...</p>
+        </div>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+
+    <div id="view-favorites" class="view hidden">
+      <div class="view-header"><h2>⭐ รายการโปรดของฉัน</h2><p class="text-muted">Prompt ที่บันทึกไว้ เข้าถึงได้รวดเร็ว</p></div>
+      <div class="prompts-grid" id="fav-grid"></div>
+      <div class="empty-state hidden" id="fav-empty">
+        <div class="empty-icon">⭐</div>
+        <h3>ยังไม่มีรายการโปรด</h3>
+        <p>กดไอคอน ⭐ บน Prompt ที่ชอบเพื่อบันทึกไว้ที่นี่</p>
+        <button class="btn-primary" onclick="navigateTo('home')">เลือก Prompt</button>
+      </div>
+    </div>
+
+    <div id="view-dashboard" class="view hidden">
+      <div class="view-header"><h2>📊 สถิติการใช้งาน</h2></div>
+      <div id="dashboard-guest" class="dashboard-guest">
+        <div class="guest-card">
+          <div class="guest-icon">📊</div>
+          <h3>เข้าสู่ระบบเพื่อดูสถิติ</h3>
+          <p>ติดตามว่าคุณใช้ Prompt ไหนบ่อยที่สุด<br/>วิเคราะห์รูปแบบการสอน และดูความก้าวหน้า</p>
+          <button class="btn-primary" onclick="openAuthModal('login')">เข้าสู่ระบบ</button>
+          <button class="btn-secondary" onclick="openAuthModal('signup')">สมัครสมาชิกฟรี</button>
+        </div>
+      </div>
+      <div id="dashboard-user" class="hidden">
+        <div class="dashboard-grid">
+          <div class="dashboard-card"><div class="d-card-icon">📋</div><div class="d-card-num" id="stat-total-copies">0</div><div class="d-card-label">Prompts ที่ copy แล้ว</div></div>
+          <div class="dashboard-card"><div class="d-card-icon">⭐</div><div class="d-card-num" id="stat-favorites">0</div><div class="d-card-label">รายการโปรด</div></div>
+          <div class="dashboard-card"><div class="d-card-icon">🔥</div><div class="d-card-num" id="stat-streak">0</div><div class="d-card-label">วันที่ใช้ต่อเนื่อง</div></div>
+          <div class="dashboard-card"><div class="d-card-icon">📚</div><div class="d-card-num" id="stat-books">0/3</div><div class="d-card-label">เล่มที่ใช้</div></div>
+        </div>
+        <div class="dashboard-section"><h3>🔝 Prompts ที่ใช้บ่อย</h3><div id="top-prompts-list"></div></div>
+        <div class="dashboard-section"><h3>📅 ประวัติการใช้งาน</h3><div id="usage-history"></div></div>
+      </div>
+    </div>
+
+    <div id="view-map" class="view hidden">
+      <div class="view-header"><h2>⚖️ Mapping กฎหมาย / หลักเกณฑ์</h2><p class="text-muted">ทุก Prompt มีฐานกฎหมายรองรับ ครูใช้ได้อย่างมั่นใจ</p></div>
+      <div class="legal-table-wrap">
+        <table class="legal-table">
+          <thead>
+            <tr>
+              <th>กฎหมาย / หลักเกณฑ์</th>
+              <th class="green-h">📗 เล่ม 1<br/><small>ลดงานสอน</small></th>
+              <th class="blue-h">📘 เล่ม 2<br/><small>วัดผล</small></th>
+              <th class="red-h">📙 เล่ม 3<br/><small>เอกสาร</small></th>
+            </tr>
+          </thead>
+          <tbody id="legal-tbody"></tbody>
+        </table>
+      </div>
+      <div class="design-principles"><h3>💡 หลักการออกแบบชุดคู่มือ</h3><div class="principles-grid" id="principles-grid"></div></div>
+    </div>
+
+    <div id="view-profile" class="view hidden">
+      <div class="view-header"><h2>👤 โปรไฟล์ของฉัน</h2></div>
+      <div class="profile-form" id="profile-form">
+        <div class="form-group"><label>ชื่อที่แสดง</label><input type="text" id="profile-name" placeholder="ชื่อ-นามสกุล หรือชื่อเล่น" /></div>
+        <div class="form-group"><label>โรงเรียน</label><input type="text" id="profile-school" placeholder="ชื่อโรงเรียน" /></div>
+        <div class="form-group"><label>วิชาที่สอน</label><input type="text" id="profile-subject" placeholder="เช่น วิทยาศาสตร์, ภาษาไทย" /></div>
+        <div class="form-group">
+          <label>ระดับชั้นที่สอน</label>
+          <select id="profile-grade">
+            <option value="">เลือกระดับชั้น</option>
+            <option>ประถมศึกษา (ป.1-6)</option>
+            <option>มัธยมศึกษาตอนต้น (ม.1-3)</option>
+            <option>มัธยมศึกษาตอนปลาย (ม.4-6)</option>
+            <option>สอนหลายระดับ</option>
+          </select>
+        </div>
+        <button class="btn-primary" onclick="saveProfile()">บันทึกโปรไฟล์</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<nav class="bottom-nav" id="bottom-nav">
+  <button class="bn-item active" onclick="navigateTo('home')" data-view="home"><span class="bn-icon">🏠</span><span class="bn-label">หน้าหลัก</span></button>
+  <button class="bn-item" onclick="openMobileSearch()" data-view="search"><span class="bn-icon">🔍</span><span class="bn-label">ค้นหา</span></button>
+  <button class="bn-item" onclick="navigateTo('favorites')" data-view="favorites"><span class="bn-icon">⭐</span><span class="bn-label">โปรด</span></button>
+  <button class="bn-item" onclick="navigateTo('dashboard')" data-view="dashboard"><span class="bn-icon">📊</span><span class="bn-label">สถิติ</span></button>
+  <button class="bn-item" id="bn-profile" onclick="openAuthModal('login')" data-view="profile"><span class="bn-icon">👤</span><span class="bn-label">บัญชี</span></button>
+</nav>
+
+<!-- PROMPT DETAIL MODAL -->
+<div class="modal-overlay hidden" id="prompt-modal-overlay" onclick="closePromptModal(event)">
+  <div class="modal prompt-modal" id="prompt-modal">
+    <button class="modal-close" onclick="closePromptModal()">✕</button>
+    <div class="modal-header">
+      <div class="modal-book-badge" id="modal-book-badge">เล่ม 1</div>
+      <div class="modal-prompt-num" id="modal-prompt-num">1.1</div>
+      <h2 class="modal-title" id="modal-title">Master Context</h2>
+    </div>
+    <div class="modal-body">
+      <div class="prompt-box" id="modal-prompt-box">
+        <div class="prompt-content" id="modal-content"></div>
+        <div class="prompt-actions">
+          <button class="btn-copy large" id="modal-copy-btn" onclick="copyPromptFromModal()">📋 คัดลอก Prompt</button>
+          <button class="btn-favorite modal-fav" id="modal-fav-btn" onclick="toggleFavoriteFromModal()">☆ บันทึกโปรด</button>
+          <button class="btn-share" onclick="sharePrompt()">🔗 แชร์</button>
+        </div>
+      </div>
+      <div class="modal-tip" id="modal-tip-section">
+        <div class="tip-header">💡 วิธีใช้</div>
+        <div id="modal-tip-text"></div>
+      </div>
+      <div class="modal-customize" id="modal-customize-section">
+        <div class="customize-header">🔧 ช่องที่ต้องปรับแต่ง</div>
+        <div class="customize-chips" id="modal-customize-chips"></div>
+      </div>
+      <div class="ai-links">
+        <span class="ai-links-label">เปิดใน AI:</span>
+        <button class="ai-btn claude" onclick="openInAI('claude')">Claude</button>
+        <button class="ai-btn chatgpt" onclick="openInAI('chatgpt')">ChatGPT</button>
+        <button class="ai-btn gemini" onclick="openInAI('gemini')">Gemini</button>
+      </div>
+      <div class="modal-legal" id="modal-legal"></div>
+    </div>
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay hidden" id="auth-modal-overlay" onclick="closeAuthModal(event)">
+  <div class="modal auth-modal" id="auth-modal">
+    <button class="modal-close" onclick="closeAuthModal()">✕</button>
+    <div id="auth-login" class="auth-panel active">
+      <div class="auth-header"><div class="auth-logo">📚</div><h2>เข้าสู่ระบบ</h2><p>AI Prompt ครูไทย</p></div>
+      <div class="form-group"><label>อีเมล</label><input type="email" id="login-email" placeholder="your@email.com" /></div>
+      <div class="form-group"><label>รหัสผ่าน</label><input type="password" id="login-password" placeholder="••••••••" /></div>
+      <div id="login-error" class="auth-error hidden"></div>
+      <button class="btn-primary full" onclick="signIn()">เข้าสู่ระบบ</button>
+      <div class="auth-divider"><span>หรือ</span></div>
+      <button class="btn-google full" onclick="signInWithGoogle()"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" alt="G" /> เข้าสู่ระบบด้วย Google</button>
+      <p class="auth-switch">ยังไม่มีบัญชี? <a href="#" onclick="switchAuthPanel('signup');return false;">สมัครสมาชิกฟรี</a></p>
+    </div>
+    <div id="auth-signup" class="auth-panel hidden">
+      <div class="auth-header"><div class="auth-logo">📚</div><h2>สมัครสมาชิกฟรี</h2><p>ติดตามสถิติ บันทึกโปรด</p></div>
+      <div class="form-group"><label>ชื่อที่แสดง</label><input type="text" id="signup-name" placeholder="ชื่อ-นามสกุล หรือชื่อเล่น" /></div>
+      <div class="form-group"><label>อีเมล</label><input type="email" id="signup-email" placeholder="your@email.com" /></div>
+      <div class="form-group"><label>รหัสผ่าน</label><input type="password" id="signup-password" placeholder="อย่างน้อย 6 ตัวอักษร" /></div>
+      <div id="signup-error" class="auth-error hidden"></div>
+      <button class="btn-primary full" onclick="signUp()">สมัครสมาชิก</button>
+      <div class="auth-divider"><span>หรือ</span></div>
+      <button class="btn-google full" onclick="signInWithGoogle()"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" alt="G" /> สมัครด้วย Google</button>
+      <p class="auth-switch">มีบัญชีแล้ว? <a href="#" onclick="switchAuthPanel('login');return false;">เข้าสู่ระบบ</a></p>
+    </div>
+    <div id="auth-reset" class="auth-panel hidden">
+      <div class="auth-header"><h2>รีเซ็ตรหัสผ่าน</h2></div>
+      <div class="form-group"><label>อีเมล</label><input type="email" id="reset-email" placeholder="your@email.com" /></div>
+      <div id="reset-msg" class="auth-success hidden"></div>
+      <button class="btn-primary full" onclick="resetPassword()">ส่งลิงก์รีเซ็ต</button>
+      <p class="auth-switch"><a href="#" onclick="switchAuthPanel('login');return false;">← กลับ</a></p>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<div class="mobile-search-overlay hidden" id="mobile-search-overlay">
+  <div class="mobile-search-inner">
+    <input type="text" id="mobile-search-input" placeholder="ค้นหา Prompt..." autocomplete="off" />
+    <button onclick="closeMobileSearch()">ยกเลิก</button>
+  </div>
+</div>
+
+<script src="data/prompts.js"></script>
+<script src="config.js"></script>
+<script src="access.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
