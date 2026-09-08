@@ -172,7 +172,8 @@ body {
 .suggestion-item:last-child { border-bottom: none; }
 
 /* Header actions */
-.header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.header-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; flex-shrink: 0; }
+
 .btn-icon {
   background: none;
   border: none;

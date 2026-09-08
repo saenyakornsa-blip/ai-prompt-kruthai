@@ -1,4 +1,4 @@
-﻿/**
+/**
  * AI Prompt ครูไทย — access.js
  * ระบบควบคุมการเข้าถึงตาม ACCESS_CONFIG.mode
  *
@@ -317,6 +317,8 @@ function onUserLoggedIn(user) {
   closeCopyGate();
   const wp = document.getElementById('welcome-popup');
   if (wp) wp.remove();
+  const ind = document.getElementById('copy-quota-indicator');
+  if (ind) ind.remove();
   state.previewMode = false;
 }
 
@@ -325,16 +327,23 @@ function onUserLoggedIn(user) {
    แสดงสถานะ guest copy quota
 ───────────────────────────────────────────── */
 function updateAccessIndicator() {
+  let indicator = document.getElementById('copy-quota-indicator');
+  if (state.user) {
+    if (indicator) indicator.remove();
+    return;
+  }
+
   const mode = (typeof ACCESS_CONFIG !== 'undefined') ? ACCESS_CONFIG.mode : 'open';
-  if (mode !== 'copy_requires_login') return;
-  if (state.user) return;
+  if (mode !== 'copy_requires_login') {
+    if (indicator) indicator.remove();
+    return;
+  }
 
   const freeCopies = ACCESS_CONFIG && ACCESS_CONFIG.freeCopiesPerDay != null
     ? ACCESS_CONFIG.freeCopiesPerDay : 3;
   if (freeCopies === 0) return;
 
   const remaining = Math.max(0, freeCopies - accessState.copyCountToday);
-  let indicator = document.getElementById('copy-quota-indicator');
   if (!indicator) {
     indicator = document.createElement('div');
     indicator.id = 'copy-quota-indicator';

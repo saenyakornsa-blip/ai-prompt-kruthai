@@ -175,6 +175,7 @@ function selectSuggestion(promptId) {
    5. FILTERING
 ═══════════════════════════════════════════════════════════════ */
 function filterByBook(bookNum) {
+  if (state.currentView !== 'home') navigateTo('home');
   state.activeBook    = bookNum;
   state.activeChapter = null;
   state.currentPage   = 1;
@@ -183,6 +184,7 @@ function filterByBook(bookNum) {
 }
 
 function filterByChapter(bookNum, chapterNum) {
+  if (state.currentView !== 'home') navigateTo('home');
   state.activeBook    = bookNum;
   state.activeChapter = chapterNum;
   state.currentPage   = 1;
@@ -191,6 +193,7 @@ function filterByChapter(bookNum, chapterNum) {
 }
 
 function filterBySituation(situation) {
+  if (state.currentView !== 'home') navigateTo('home');
   state.activeSituation = situation;
   state.currentPage     = 1;
   document.querySelectorAll('[data-situation]').forEach(el => {
@@ -200,6 +203,7 @@ function filterBySituation(situation) {
 }
 
 function filterByTag(tag) {
+  if (state.currentView !== 'home') navigateTo('home');
   state.activeTag   = (state.activeTag === tag) ? null : tag;
   state.currentPage = 1;
   renderTagsBar();
@@ -207,6 +211,7 @@ function filterByTag(tag) {
 }
 
 function filterMaster() {
+  if (state.currentView !== 'home') navigateTo('home');
   state.isMasterOnly = !state.isMasterOnly;
   state.currentPage  = 1;
   const btn = document.getElementById('master-filter-btn');
@@ -216,6 +221,7 @@ function filterMaster() {
 
 // Toggle chapter sub-menu expand/collapse in sidebar
 function toggleBook(bookNum) {
+  if (state.currentView !== 'home') navigateTo('home');
   const chapters = document.getElementById('chapters-' + bookNum);
   const chevron  = document.querySelector('[data-book="' + bookNum + '"] .chevron');
 
