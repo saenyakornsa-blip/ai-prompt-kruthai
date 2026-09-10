@@ -1,4 +1,4 @@
-﻿-- ============================================================
+-- ============================================================
 -- AI Prompt ครูไทย — Supabase Database Setup
 -- วิธีใช้: Dashboard > SQL Editor > วางและกด Run
 -- ============================================================
@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS public.copy_events (
 );
 
 -- View: ความนิยมของ Prompt
-CREATE OR REPLACE VIEW public.prompt_popularity AS
+CREATE OR REPLACE VIEW public.prompt_popularity
+WITH (security_invoker = true) AS
   SELECT
     prompt_id,
     COUNT(*) as total_copies,
@@ -48,7 +49,8 @@ CREATE OR REPLACE VIEW public.prompt_popularity AS
   ORDER BY total_copies DESC;
 
 -- View: สถิติผู้ใช้
-CREATE OR REPLACE VIEW public.user_stats AS
+CREATE OR REPLACE VIEW public.user_stats
+WITH (security_invoker = true) AS
   SELECT
     ce.user_id,
     COUNT(*) as total_copies,
@@ -111,7 +113,8 @@ CREATE POLICY "Users can update their rating" ON public.prompt_ratings FOR UPDAT
 CREATE POLICY "Users can delete their rating" ON public.prompt_ratings FOR DELETE USING (auth.uid() = user_id);
 
 -- View: สรุปคะแนนเฉลี่ยและความนิยมของแต่ละ Prompt
-CREATE OR REPLACE VIEW public.prompt_ratings_summary AS
+CREATE OR REPLACE VIEW public.prompt_ratings_summary
+WITH (security_invoker = true) AS
   SELECT
     prompt_id,
     ROUND(AVG(rating)::numeric, 1) as avg_rating,
