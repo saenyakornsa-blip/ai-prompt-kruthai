@@ -518,13 +518,21 @@ async function _doCopyPrompt(p) {
   logCopyEvent(promptId);
 
   // Log to Supabase
-  if (_sb && state.user) {
-    _sb.from('copy_events').insert({
+  if (_sb) {
+    const copyData = {
       prompt_id: promptId,
-      user_id:   state.user.id,
-      created_at: new Date().toISOString()
-    }).then(({ error }) => {
-      if (error) console.warn('[Supabase] copy_events insert error:', error);
+      user_id: (state.user && state.user.id) ? state.user.id : null,
+      book_number: p.book || null,
+      chapter_number: p.chapter || null,
+      session_id: getOrCreateSessionId()
+    };
+
+    _sb.from('copy_events').insert(copyData).then(({ error }) => {
+      if (error) {
+        console.warn('[Supabase] copy_events insert error:', error);
+      } else {
+        console.log('[Supabase] Logged copy event for', promptId);
+      }
     });
   }
 
@@ -554,6 +562,19 @@ function getCopyStats() {
   try {
     return JSON.parse(localStorage.getItem('ai_prompt_kruthai_copy_stats') || '{}');
   } catch { return {}; }
+}
+
+function getOrCreateSessionId() {
+  try {
+    let sid = sessionStorage.getItem('ai_prompt_session_id');
+    if (!sid) {
+      sid = 'sess_' + Math.random().toString(36).substring(2, 12);
+      sessionStorage.setItem('ai_prompt_session_id', sid);
+    }
+    return sid;
+  } catch {
+    return null;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
