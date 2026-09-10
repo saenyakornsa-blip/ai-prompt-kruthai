@@ -697,6 +697,9 @@ function openPromptModal(promptId) {
 
   // Update URL hash for deep-linking
   history.pushState(null, '', `#${p.id}`);
+
+  // Load rating and reviews for this prompt
+  loadPromptFeedback(p.id);
 }
 
 function closePromptModal(event) {
@@ -719,6 +722,232 @@ function closePromptModalForce() {
 function setModalField(id, text) {
   const el = document.getElementById(id);
   if (el) el.textContent = text;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   11.5 RATING & FEEDBACK SYSTEM (5 ดาว & คำแนะนำจากผู้ใช้)
+═══════════════════════════════════════════════════════════════ */
+let currentSelectedRating = 0;
+
+const RATING_LABELS = {
+  0: 'คลิกดาวเพื่อให้คะแนน Prompt นี้',
+  1: '⭐ 1 ดาว — พอใช้ / ควรปรับปรุง',
+  2: '⭐⭐ 2 ดาว — พอใช้ได้',
+  3: '⭐⭐⭐ 3 ดาว — ปานกลาง / มีประโยชน์',
+  4: '⭐⭐⭐⭐ 4 ดาว — ดีมาก / แนะนำ',
+  5: '⭐⭐⭐⭐⭐ 5 ดาว — ยอดเยี่ยม! นำไปใช้ได้จริง'
+};
+
+function selectStarRating(val) {
+  currentSelectedRating = val;
+  updateStarUI(val);
+  const label = document.getElementById('star-label');
+  if (label) label.textContent = RATING_LABELS[val] || '';
+}
+
+function hoverStarRating(val) {
+  document.querySelectorAll('.star-btn').forEach(btn => {
+    const r = parseInt(btn.dataset.rating, 10);
+    btn.classList.toggle('hover', r <= val);
+  });
+}
+
+function resetStarHover() {
+  document.querySelectorAll('.star-btn').forEach(btn => {
+    btn.classList.remove('hover');
+  });
+}
+
+function updateStarUI(rating) {
+  document.querySelectorAll('.star-btn').forEach(btn => {
+    const r = parseInt(btn.dataset.rating, 10);
+    btn.classList.toggle('active', r <= rating);
+  });
+}
+
+async function loadPromptFeedback(promptId) {
+  currentSelectedRating = 0;
+  updateStarUI(0);
+  const label = document.getElementById('star-label');
+  if (label) label.textContent = RATING_LABELS[0];
+  const commentInput = document.getElementById('feedback-comment');
+  if (commentInput) commentInput.value = '';
+
+  const reviewsList = document.getElementById('reviews-list');
+  if (reviewsList) {
+    reviewsList.innerHTML = '<div class="no-reviews">กำลังโหลดความคิดเห็น...</div>';
+  }
+
+  let reviews = [];
+
+  // 1. Try fetching from Supabase
+  if (_sb) {
+    try {
+      const { data, error } = await _sb
+        .from('prompt_ratings')
+        .select('*')
+        .eq('prompt_id', promptId)
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data)) {
+        reviews = data;
+        try { localStorage.setItem(`ai_ratings_${promptId}`, JSON.stringify(data)); } catch {}
+      }
+    } catch (err) {
+      console.warn('[Supabase] Failed to fetch ratings:', err);
+    }
+  }
+
+  // 2. Fallback to localStorage if no reviews fetched
+  if (reviews.length === 0) {
+    try {
+      const cached = localStorage.getItem(`ai_ratings_${promptId}`);
+      if (cached) reviews = JSON.parse(cached);
+    } catch {}
+  }
+
+  // 3. Render score summary
+  const scoreNum   = document.getElementById('modal-score-num');
+  const scoreStars = document.getElementById('modal-score-stars');
+  const scoreCount = document.getElementById('modal-score-count');
+
+  if (reviews.length > 0) {
+    const sum = reviews.reduce((acc, r) => acc + (Number(r.rating) || 0), 0);
+    const avg = (sum / reviews.length).toFixed(1);
+    const starCount = Math.round(Number(avg));
+    const starStr = '★'.repeat(starCount) + '☆'.repeat(5 - starCount);
+
+    if (scoreNum)   scoreNum.textContent = avg;
+    if (scoreStars) scoreStars.textContent = starStr;
+    if (scoreCount) scoreCount.textContent = `(${reviews.length} รีวิว)`;
+  } else {
+    if (scoreNum)   scoreNum.textContent = '--';
+    if (scoreStars) scoreStars.textContent = '☆☆☆☆☆';
+    if (scoreCount) scoreCount.textContent = '(0 รีวิว)';
+  }
+
+  // 4. Pre-fill user's previous rating if logged in
+  if (state.user) {
+    const myReview = reviews.find(r => r.user_id === state.user.id);
+    if (myReview) {
+      selectStarRating(myReview.rating);
+      if (commentInput && myReview.comment) commentInput.value = myReview.comment;
+      if (label) label.textContent = `${RATING_LABELS[myReview.rating]} (คะแนนเดิมของคุณ)`;
+      const btn = document.getElementById('btn-submit-feedback');
+      if (btn) btn.innerHTML = '<span>✏️ อัปเดตคำแนะนำของคุณ</span>';
+    } else {
+      const btn = document.getElementById('btn-submit-feedback');
+      if (btn) btn.innerHTML = '<span>💬 ส่งคำแนะนำ / รีวิว</span>';
+    }
+  } else {
+    const btn = document.getElementById('btn-submit-feedback');
+    if (btn) btn.innerHTML = '<span>💬 ส่งคำแนะนำ / รีวิว</span>';
+  }
+
+  // 5. Render reviews list
+  if (reviewsList) {
+    const reviewsWithComments = reviews.filter(r => r.comment && r.comment.trim());
+    if (reviewsWithComments.length === 0) {
+      reviewsList.innerHTML = '<div class="no-reviews">ยังไม่มีข้อเสนอแนะ เป็นคนแรกที่ให้คำแนะนำสำหรับ Prompt นี้!</div>';
+    } else {
+      reviewsList.innerHTML = reviewsWithComments.map(r => {
+        const author = r.user_name || 'คุณครู';
+        const stars = '★'.repeat(r.rating || 5) + '☆'.repeat(5 - (r.rating || 5));
+        const date = r.created_at ? new Date(r.created_at).toLocaleDateString('th-TH') : '';
+        return `
+          <div class="review-item">
+            <div class="review-item-header">
+              <span class="review-author">👤 ${escapeHtml(author)}</span>
+              <div>
+                <span class="review-stars">${stars}</span>
+                <span class="review-date">${date}</span>
+              </div>
+            </div>
+            <div class="review-text">${escapeHtml(r.comment)}</div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+}
+
+async function submitPromptFeedback() {
+  if (currentSelectedRating === 0) {
+    showToast('กรุณาคลิกเลือกดาว (1-5 ดาว) เพื่อประเมินก่อนครับ ⭐', 'info');
+    return;
+  }
+
+  if (!state.user) {
+    showToast('กรุณาเข้าสู่ระบบก่อนส่งคำแนะนำหรือให้คะแนนครับ', 'info');
+    openAuthModal('login');
+    return;
+  }
+
+  const p = state.currentPrompt;
+  if (!p) return;
+
+  const commentInput = document.getElementById('feedback-comment');
+  const comment = commentInput ? commentInput.value.trim() : '';
+
+  const submitBtn = document.getElementById('btn-submit-feedback');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span>⏳ กำลังบันทึก...</span>';
+  }
+
+  const userName = state.user.user_metadata?.display_name || state.user.email?.split('@')[0] || 'คุณครู';
+
+  const reviewObj = {
+    prompt_id: p.id,
+    user_id: state.user.id,
+    user_name: userName,
+    rating: currentSelectedRating,
+    comment: comment,
+    created_at: new Date().toISOString()
+  };
+
+  // 1. Save to Supabase
+  if (_sb) {
+    try {
+      const { error } = await _sb.from('prompt_ratings').upsert(reviewObj, {
+        onConflict: 'user_id,prompt_id'
+      });
+      if (error) {
+        console.warn('[Supabase] prompt_ratings upsert error:', error);
+      }
+    } catch (err) {
+      console.warn('[Supabase] ratings error:', err);
+    }
+  }
+
+  // 2. Also cache in localStorage
+  try {
+    const key = `ai_ratings_${p.id}`;
+    let cached = [];
+    const raw = localStorage.getItem(key);
+    if (raw) cached = JSON.parse(raw);
+    const existingIdx = cached.findIndex(r => r.user_id === state.user.id);
+    if (existingIdx >= 0) {
+      cached[existingIdx] = reviewObj;
+    } else {
+      cached.unshift(reviewObj);
+    }
+    localStorage.setItem(key, JSON.stringify(cached));
+  } catch {}
+
+  if (submitBtn) {
+    submitBtn.disabled = false;
+  }
+
+  showToast('บันทึกคะแนนและคำแนะนำเรียบร้อยแล้ว ขอบคุณมากครับ! ⭐', 'success');
+  loadPromptFeedback(p.id);
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/[&<>"']/g, m => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[m]);
 }
 
 /* ═══════════════════════════════════════════════════════════════

@@ -86,3 +86,35 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ============================================================
+-- ตาราง: ให้คะแนนและคำแนะนำ/รีวิว Prompt (5 ดาว)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.prompt_ratings (
+  id BIGSERIAL PRIMARY KEY,
+  prompt_id TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  user_name TEXT,
+  rating INTEGER CHECK (rating >= 1 AND rating <= 5) NOT NULL,
+  comment TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, prompt_id)
+);
+
+ALTER TABLE public.prompt_ratings ENABLE ROW LEVEL SECURITY;
+
+-- นโยบายความปลอดภัย (RLS)
+CREATE POLICY "Anyone can read ratings" ON public.prompt_ratings FOR SELECT USING (true);
+CREATE POLICY "Users can insert their rating" ON public.prompt_ratings FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their rating" ON public.prompt_ratings FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their rating" ON public.prompt_ratings FOR DELETE USING (auth.uid() = user_id);
+
+-- View: สรุปคะแนนเฉลี่ยและความนิยมของแต่ละ Prompt
+CREATE OR REPLACE VIEW public.prompt_ratings_summary AS
+  SELECT
+    prompt_id,
+    ROUND(AVG(rating)::numeric, 1) as avg_rating,
+    COUNT(*) as total_reviews
+  FROM public.prompt_ratings
+  GROUP BY prompt_id;
