@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Kanit:wght@600;700;800&display=swap" />
   </noscript>
   <!-- Supabase: loaded dynamically by app.js when config is set -->
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=1.1.0" />
 </head>
 <body class="light-mode">
 
@@ -472,9 +472,27 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="data/prompts.js"></script>
-<script src="config.js"></script>
-<script src="access.js"></script>
-<script src="app.js"></script>
+<script src="data/prompts.js?v=1.1.0"></script>
+<script src="config.js?v=1.1.0"></script>
+<script src="access.js?v=1.1.0"></script>
+<script src="app.js?v=1.1.0"></script>
+<script>
+  // Fallback direct event handling for guide triggers
+  document.addEventListener('click', function(e) {
+    var trigger = e.target.closest('.btn-guide-header, .guide-banner, .guide-banner-btn, .nav-guide-item');
+    if (trigger) {
+      e.preventDefault();
+      if (typeof window.openGuideModal === 'function') {
+        window.openGuideModal();
+      } else {
+        var ov = document.getElementById('guide-modal-overlay');
+        if (ov) {
+          ov.classList.remove('hidden');
+          ov.style.display = 'flex';
+        }
+      }
+    }
+  });
+</script>
 </body>
 </html>

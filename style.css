@@ -1783,6 +1783,9 @@ body.dark-mode .copy-gate-benefits span {
 }
 
 /* Guide Modal Styling */
+#guide-modal-overlay {
+  z-index: 1000;
+}
 .guide-modal {
   max-width: 580px;
   width: 92%;

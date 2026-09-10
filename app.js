@@ -1921,6 +1921,7 @@ function openGuideModal() {
   const overlay = document.getElementById('guide-modal-overlay');
   if (overlay) {
     overlay.classList.remove('hidden');
+    overlay.style.display = 'flex';
     const chk = document.getElementById('guide-dont-show-again');
     if (chk) {
       chk.checked = localStorage.getItem('ai_prompt_guide_dismissed') === '1';
@@ -1929,7 +1930,7 @@ function openGuideModal() {
 }
 
 function closeGuideModal(event) {
-  if (event && event.target !== document.getElementById('guide-modal-overlay')) return;
+  if (event && event.target !== document.getElementById('guide-modal-overlay') && !event.target.classList.contains('modal-close') && !event.target.classList.contains('btn-secondary')) return;
   const overlay = document.getElementById('guide-modal-overlay');
   const chk = document.getElementById('guide-dont-show-again');
   if (chk && chk.checked) {
@@ -1937,7 +1938,10 @@ function closeGuideModal(event) {
   } else {
     localStorage.removeItem('ai_prompt_guide_dismissed');
   }
-  if (overlay) overlay.classList.add('hidden');
+  if (overlay) {
+    overlay.classList.add('hidden');
+    overlay.style.display = 'none';
+  }
 }
 
 async function copyMasterContextPrompt(btnEl) {
@@ -1960,12 +1964,26 @@ async function copyPromptAndCloseGuide() {
   }
   await copyPrompt('b1_1_1');
   const overlay = document.getElementById('guide-modal-overlay');
-  if (overlay) overlay.classList.add('hidden');
+  if (overlay) {
+    overlay.classList.add('hidden');
+    overlay.style.display = 'none';
+  }
 }
 
 function openPrompt11Details() {
   const overlay = document.getElementById('guide-modal-overlay');
-  if (overlay) overlay.classList.add('hidden');
+  if (overlay) {
+    overlay.classList.add('hidden');
+    overlay.style.display = 'none';
+  }
   openPromptModal('b1_1_1');
 }
+
+// Expose globally on window
+window.openGuideModal = openGuideModal;
+window.closeGuideModal = closeGuideModal;
+window.copyMasterContextPrompt = copyMasterContextPrompt;
+window.copyPromptAndCloseGuide = copyPromptAndCloseGuide;
+window.openPrompt11Details = openPrompt11Details;
+
 
