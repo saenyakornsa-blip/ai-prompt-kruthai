@@ -71,8 +71,17 @@ CREATE POLICY "Users read own profile" ON public.profiles FOR SELECT USING (auth
 CREATE POLICY "Users update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
 CREATE POLICY "Users insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 CREATE POLICY "Users manage own favorites" ON public.favorites USING (auth.uid() = user_id);
-CREATE POLICY "Anyone can log copies" ON public.copy_events FOR INSERT WITH CHECK (true);
-CREATE POLICY "Users read own copies" ON public.copy_events FOR SELECT USING (auth.uid() = user_id);
+-- Copy events: บันทึกการใช้งาน (ทั้งบุคคลทั่วไปและสมาชิก)
+DROP POLICY IF EXISTS "Anyone can log copies" ON public.copy_events;
+DROP POLICY IF EXISTS "Users read own copies" ON public.copy_events;
+
+CREATE POLICY "Anyone can log copies" ON public.copy_events
+  FOR INSERT TO anon, authenticated
+  WITH CHECK (prompt_id IS NOT NULL);
+
+CREATE POLICY "Users read own copies" ON public.copy_events
+  FOR SELECT TO authenticated
+  USING (auth.uid() = user_id);
 
 -- Function: สร้าง profile อัตโนมัติเมื่อสมัครสมาชิก
 CREATE OR REPLACE FUNCTION public.handle_new_user()

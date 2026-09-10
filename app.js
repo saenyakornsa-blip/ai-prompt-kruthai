@@ -532,11 +532,13 @@ async function _doCopyPrompt(p) {
         console.warn('[Supabase] copy_events insert error:', error);
       } else {
         console.log('[Supabase] Logged copy event for', promptId);
+        if (state.currentView === 'dashboard') loadDashboard();
       }
     });
   }
 
   showToast('คัดลอก Prompt แล้ว! วางใน Claude, ChatGPT หรือ Gemini ได้เลย', 'success');
+  if (state.currentView === 'dashboard') loadDashboard();
   if (typeof updateAccessIndicator === 'function') updateAccessIndicator();
 }
 
@@ -1208,9 +1210,11 @@ async function onAuthStateChanged(user) {
     // Update bottom nav profile button
     const bnProfile = document.getElementById('bn-profile');
     if (bnProfile) bnProfile.onclick = function() { navigateTo('profile'); };
+    if (state.currentView === 'dashboard') loadDashboard();
   } else {
     // Logged out — re-enforce access rules
     if (typeof initAccessSystem === 'function') initAccessSystem();
+    if (state.currentView === 'dashboard') loadDashboard();
   }
 }
 
@@ -1438,53 +1442,239 @@ async function loadDashboard() {
   const userEl  = document.getElementById('dashboard-user');
 
   if (!state.user) {
-    guestEl?.classList.remove('hidden');
-    userEl?.classList.add('hidden');
+    if (guestEl) guestEl.classList.remove('hidden');
+    if (userEl) userEl.classList.add('hidden');
     return;
   }
 
-  guestEl?.classList.add('hidden');
-  userEl?.classList.remove('hidden');
+  if (guestEl) guestEl.classList.add('hidden');
+  if (userEl) userEl.classList.remove('hidden');
 
-  // Stats from localStorage
-  const stats       = getCopyStats();
-  const totalCopies = Object.values(stats).reduce((s, v) => s + v, 0);
-  const booksUsed   = new Set(
-    Object.keys(stats)
-      .map(id => PROMPTS_DATA.find(p => p.id === id)?.book)
-      .filter(Boolean)
-  ).size;
+  // 1. ดึงข้อมูลจาก Supabase copy_events ถ้าล็อกอินและเชื่อมต่ออยู่
+  let userEvents = [];
 
-  setDashboardStat('dash-total-copies',  totalCopies);
-  setDashboardStat('dash-total-favs',    state.favorites.size);
-  setDashboardStat('dash-books-used',    booksUsed);
+  if (_sb && state.user && state.user.id) {
+    try {
+      const { data, error } = await _sb
+        .from('copy_events')
+        .select('prompt_id, book_number, chapter_number, copied_at')
+        .eq('user_id', state.user.id)
+        .order('copied_at', { ascending: false });
 
-  // Top 5 prompts
-  const top5 = Object.entries(stats)
+      if (!error && Array.isArray(data)) {
+        userEvents = data;
+      } else if (error) {
+        console.warn('[Supabase] loadDashboard copy_events fetch error:', error);
+      }
+    } catch (err) {
+      console.warn('[Supabase] loadDashboard fetch exception:', err);
+    }
+  }
+
+  // 2. ดึงข้อมูลจาก LocalStorage (เผื่อออฟไลน์ หรือมีประวัติในเครื่อง)
+  const localStats = getCopyStats();
+  const histKey = 'ai_prompt_kruthai_copy_history';
+  let localHist = [];
+  try {
+    localHist = JSON.parse(localStorage.getItem(histKey) || '[]');
+  } catch (e) {
+    console.warn('[LocalStorage] parse copy history error:', e);
+  }
+
+  // ถ้าใน Cloud ไม่มีข้อมูล แต่เครื่องมีข้อมูล ให้ใช้ข้อมูลในเครื่อง
+  if (userEvents.length === 0 && localHist.length > 0) {
+    userEvents = localHist.map(h => ({
+      prompt_id: h.id,
+      copied_at: h.ts ? new Date(h.ts).toISOString() : new Date().toISOString()
+    }));
+  }
+
+  // 3. คำนวณสถิติ
+  // จำนวน Prompts ที่ Copy แล้ว
+  const totalCopies = userEvents.length > 0
+    ? userEvents.length
+    : Object.values(localStats).reduce((s, v) => s + v, 0);
+
+  // รายการโปรด
+  const totalFavs = state.favorites ? state.favorites.size : 0;
+
+  // เล่มที่ใช้ (เล่ม 1, 2, 3)
+  const booksSet = new Set();
+  if (userEvents.length > 0) {
+    userEvents.forEach(e => {
+      let b = e.book_number;
+      if (!b) {
+        const p = PROMPTS_DATA.find(x => x.id === e.prompt_id);
+        if (p) b = p.book;
+      }
+      if (b) booksSet.add(b);
+    });
+  } else {
+    Object.keys(localStats).forEach(id => {
+      const p = PROMPTS_DATA.find(x => x.id === id);
+      if (p && p.book) booksSet.add(p.book);
+    });
+  }
+  const booksUsedStr = `${booksSet.size}/3`;
+
+  // วันที่ใช้งานต่อเนื่อง (Streak)
+  const streakDays = calculateUsageStreak(userEvents.length > 0 ? userEvents : localHist);
+
+  // 4. แสดงผลตัวเลขใน Card สถิติทั้ง 4 ตัว (ตรงตาม ID ใน index.html)
+  setDashboardStat('stat-total-copies', totalCopies);
+  setDashboardStat('stat-favorites',    totalFavs);
+  setDashboardStat('stat-streak',       streakDays > 0 ? `${streakDays} วัน` : '0 วัน');
+  setDashboardStat('stat-books',        booksUsedStr);
+
+  // 5. แสดง Prompts ที่ใช้บ่อย (Top 5)
+  const promptCountMap = {};
+  if (userEvents.length > 0) {
+    userEvents.forEach(e => {
+      if (e.prompt_id) {
+        promptCountMap[e.prompt_id] = (promptCountMap[e.prompt_id] || 0) + 1;
+      }
+    });
+  } else {
+    Object.assign(promptCountMap, localStats);
+  }
+
+  const top5 = Object.entries(promptCountMap)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
-    .map(([id, count]) => {
+    .map(([id, count], idx) => {
       const p = PROMPTS_DATA.find(x => x.id === id);
-      return p ? { ...p, count } : null;
+      return p ? { ...p, count, rank: idx + 1 } : null;
     })
     .filter(Boolean);
 
-  const listEl = document.getElementById('dash-top-prompts');
-  if (listEl) {
-    listEl.innerHTML = top5.length
+  const topListEl = document.getElementById('top-prompts-list');
+  if (topListEl) {
+    topListEl.innerHTML = top5.length
       ? top5.map(p => `
-          <div class="dash-prompt-row" onclick="openPromptModal('${p.id}')">
-            <span class="dash-prompt-num">${p.promptNum}</span>
-            <span class="dash-prompt-title">${p.title}</span>
-            <span class="dash-prompt-count">${p.count}×</span>
+          <div class="dash-prompt-row book-${p.book}" onclick="openPromptModal('${p.id}')">
+            <div class="dash-rank">#${p.rank}</div>
+            <div class="dash-prompt-info">
+              <div class="dash-prompt-header">
+                <span class="card-book-badge book${p.book}">เล่ม ${p.book}</span>
+                <span class="dash-prompt-num">Prompt ${p.promptNum}</span>
+              </div>
+              <div class="dash-prompt-title">${p.title}</div>
+            </div>
+            <div class="dash-prompt-count-pill">${p.count} ครั้ง</div>
           </div>`).join('')
-      : '<p class="empty-text">ยังไม่มีข้อมูลการใช้งาน</p>';
+      : '<div class="empty-text">ยังไม่มีข้อมูล Prompts ที่ใช้บ่อย กดคัดลอก Prompt เพื่อเริ่มต้นสะสมสถิติ</div>';
+  }
+
+  // 6. แสดงประวัติการใช้งาน (Recent History)
+  const historyListEl = document.getElementById('usage-history');
+  if (historyListEl) {
+    const recent = userEvents.slice(0, 15);
+    historyListEl.innerHTML = recent.length
+      ? recent.map(item => {
+          const p = PROMPTS_DATA.find(x => x.id === item.prompt_id);
+          const timeAgo = formatTimeAgo(item.copied_at || item.ts);
+          if (!p) {
+            return `
+              <div class="dash-history-row">
+                <div class="history-main">
+                  <div class="history-title">Prompt: ${item.prompt_id}</div>
+                </div>
+                <div class="history-time">${timeAgo}</div>
+              </div>`;
+          }
+          return `
+            <div class="dash-history-row book-${p.book}" onclick="openPromptModal('${p.id}')">
+              <span class="dash-history-badge book${p.book}">เล่ม ${p.book}</span>
+              <div class="history-main">
+                <div class="history-title"><strong>${p.promptNum}</strong> ${p.title}</div>
+              </div>
+              <div class="history-time">${timeAgo}</div>
+            </div>`;
+        }).join('')
+      : '<div class="empty-text">ยังไม่มีประวัติการใช้งาน</div>';
   }
 }
 
 function setDashboardStat(id, value) {
   const el = document.getElementById(id);
   if (el) el.textContent = value;
+}
+
+function calculateUsageStreak(events) {
+  if (!events || events.length === 0) return 0;
+  const dateStrings = new Set();
+  events.forEach(e => {
+    const raw = e.copied_at || e.ts;
+    if (!raw) return;
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      dateStrings.add(`${yyyy}-${mm}-${dd}`);
+    }
+  });
+
+  if (dateStrings.size === 0) return 0;
+
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yY = yesterday.getFullYear();
+  const yM = String(yesterday.getMonth() + 1).padStart(2, '0');
+  const yD = String(yesterday.getDate()).padStart(2, '0');
+  const yesterdayStr = `${yY}-${yM}-${yD}`;
+
+  let checkDate = null;
+  if (dateStrings.has(todayStr)) {
+    checkDate = new Date(today);
+  } else if (dateStrings.has(yesterdayStr)) {
+    checkDate = new Date(yesterday);
+  } else {
+    return 0; // ไม่ได้ใช้ในวันนี้หรือเมื่อวาน ถือว่า Streak ขาด
+  }
+
+  let streak = 0;
+  while (true) {
+    const cy = checkDate.getFullYear();
+    const cm = String(checkDate.getMonth() + 1).padStart(2, '0');
+    const cd = String(checkDate.getDate()).padStart(2, '0');
+    const key = `${cy}-${cm}-${cd}`;
+    if (dateStrings.has(key)) {
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+function formatTimeAgo(timestamp) {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  if (isNaN(date.getTime())) return '';
+  const diffMs = Date.now() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  if (diffSec < 60) return 'เมื่อสักครู่';
+  if (diffMin < 60) return `${diffMin} นาทีที่แล้ว`;
+  if (diffHr < 24) return `${diffHr} ชั่วโมงที่แล้ว`;
+  if (diffDay === 1) return 'เมื่อวานนี้';
+  if (diffDay < 7) return `${diffDay} วันที่แล้ว`;
+
+  const d = String(date.getDate()).padStart(2, '0');
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const y = date.getFullYear() + 543;
+  return `${d}/${m}/${y}`;
 }
 
 /* ═══════════════════════════════════════════════════════════════
