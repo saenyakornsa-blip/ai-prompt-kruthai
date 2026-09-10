@@ -36,6 +36,10 @@
       <div id="search-suggestions" class="search-suggestions hidden"></div>
     </div>
     <div class="header-actions">
+      <button class="btn-guide-header" onclick="openGuideModal()" title="วิธีใช้งาน 3 ขั้นตอน">
+        <span class="guide-icon">💡</span>
+        <span class="guide-text">วิธีใช้</span>
+      </button>
       <button class="btn-icon" id="theme-toggle" title="เปลี่ยนธีม" aria-label="Toggle dark mode">🌙</button>
       <button class="btn-icon" id="favorites-btn" title="รายการโปรด" onclick="navigateTo('favorites')">
         ⭐ <span class="badge" id="fav-count">0</span>
@@ -119,6 +123,7 @@
       </div>
       <hr class="sidebar-divider" />
       <h3 class="nav-section-label">เข้าถึงด่วน</h3>
+      <button class="nav-item nav-guide-item" onclick="openGuideModal()">💡 วิธีใช้งาน (3 ขั้นตอน)</button>
       <button class="nav-item" onclick="navigateTo('map')">⚖️ Mapping กฎหมาย</button>
       <button class="nav-item" onclick="filterMaster()">⭐ Master Prompts</button>
       <button class="nav-item" onclick="navigateTo('dashboard')">📊 สถิติการใช้งาน</button>
@@ -134,6 +139,16 @@
           <div class="stat-card"><div class="stat-num">19</div><div class="stat-label">บท/หมวด</div></div>
           <div class="stat-card"><div class="stat-num">5</div><div class="stat-label">กฎหมายอ้างอิง</div></div>
         </div>
+
+        <!-- Quick Guide Banner -->
+        <div class="guide-banner" onclick="openGuideModal()">
+          <div class="guide-banner-left">
+            <span class="guide-banner-badge">💡 แนะนำเริ่มต้น</span>
+            <span class="guide-banner-title">เปิด Session ใหม่ใน AI ให้คัดลอก <strong>Prompt 1.1 Master Context</strong> ไปวางก่อนเสมอ!</span>
+          </div>
+          <button class="guide-banner-btn" onclick="event.stopPropagation(); openGuideModal()">ดู 3 ขั้นตอน →</button>
+        </div>
+
         <div class="situation-bar">
           <span class="situation-label">🎯 เลือกตามสถานการณ์:</span>
           <button class="situation-btn active" onclick="filterBySituation('all')">ทั้งหมด</button>
@@ -324,6 +339,91 @@
       </div>
 
       <div class="modal-legal" id="modal-legal"></div>
+    </div>
+  </div>
+</div>
+
+<!-- QUICK GUIDE MODAL -->
+<div class="modal-overlay hidden" id="guide-modal-overlay" onclick="closeGuideModal(event)">
+  <div class="modal guide-modal" id="guide-modal">
+    <button class="modal-close" onclick="closeGuideModal()">✕</button>
+    <div class="guide-modal-header">
+      <div class="guide-header-icon">💡</div>
+      <div>
+        <h2>แนะนำวิธีใช้งาน 3 ขั้นตอนง่ายๆ</h2>
+        <p class="text-muted">คู่มือเริ่มต้นใช้งานเพื่อผลลัพธ์ที่ตรงกับห้องเรียนของคุณครูที่สุด</p>
+      </div>
+    </div>
+
+    <div class="guide-steps-list">
+      <!-- Step 1 -->
+      <div class="guide-step-card step-highlight">
+        <div class="guide-step-badge">1</div>
+        <div class="guide-step-content">
+          <div class="guide-step-title">
+            <span>⭐ วาง Master Context ก่อนเสมอ (สำคัญที่สุด)</span>
+          </div>
+          <p class="guide-step-desc">
+            ทุกครั้งที่เริ่มเปิดห้องแชทใหม่ใน <strong>Claude, ChatGPT หรือ Gemini</strong> ให้คัดลอก 
+            <span class="guide-prompt-tag">เล่ม 1 — Prompt 1.1 Master Context</span> ไปวางเป็นคำสั่งแรก เพื่อตั้งค่าให้ AI สวมบทบาทเป็นผู้เชี่ยวชาญการจัดการเรียนรู้ของครูไทย
+          </p>
+          <div class="guide-step-actions">
+            <button class="btn-copy-11" onclick="copyMasterContextPrompt(this)">
+              📋 คัดลอก Prompt 1.1 ทันที
+            </button>
+            <button class="btn-view-11" onclick="openPrompt11Details()">
+              🔍 ดูเนื้อหา Prompt 1.1
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="guide-step-card">
+        <div class="guide-step-badge">2</div>
+        <div class="guide-step-content">
+          <div class="guide-step-title">
+            <span>✏️ ปรับแต่งข้อความใน [วงเล็บ]</span>
+          </div>
+          <p class="guide-step-desc">
+            ใน Prompt จะมีข้อความในเครื่องหมาย <code class="code-bracket">[...]</code> เช่น 
+            <code>[ชื่อวิชา]</code>, <code>[ระดับชั้น]</code>, <code>[จำนวนนักเรียน]</code> ให้คุณครูแก้ไขเป็นข้อมูลจริงของห้องเรียนตนเอง
+          </p>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="guide-step-card">
+        <div class="guide-step-badge">3</div>
+        <div class="guide-step-content">
+          <div class="guide-step-title">
+            <span>🚀 เลือก Prompt ภารกิจที่ต้องการ แล้วสั่งต่อได้เลย</span>
+          </div>
+          <p class="guide-step-desc">
+            เลือกค้นหา Prompt จาก 3 เล่มตามงานที่ต้องการ นำไปวางต่อในห้องแชทเดิมได้ทันที:
+          </p>
+          <div class="guide-books-mini">
+            <div class="mini-book b1">📗 <strong>เล่ม 1</strong> ออกแบบแผนฯ / สื่อใบงาน / Active Learning</div>
+            <div class="mini-book b2">📘 <strong>เล่ม 2</strong> ข้อสอบ HOTS / รูบริก Rubric / ซ่อมเสริม</div>
+            <div class="mini-book b3">📙 <strong>เล่ม 3</strong> บันทึกข้อความ / โครงการ / วPA / SAR / วิจัย CAR</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="guide-modal-footer">
+      <label class="guide-dismiss-label">
+        <input type="checkbox" id="guide-dont-show-again" />
+        <span>ไม่ต้องแสดงคำแนะนำนี้อัตโนมัติอีก</span>
+      </label>
+      <div class="guide-footer-btns">
+        <button class="btn-primary" onclick="copyPromptAndCloseGuide()">
+          📋 คัดลอก Prompt 1.1 แล้วเริ่มใช้งาน
+        </button>
+        <button class="btn-secondary" onclick="closeGuideModal()">
+          เข้าใจแล้ว
+        </button>
+      </div>
     </div>
   </div>
 </div>

@@ -1753,6 +1753,9 @@ async function init() {
     if (PROMPTS_DATA.find(p => p.id === promptId)) {
       setTimeout(() => openPromptModal(promptId), 100);
     }
+  } else if (localStorage.getItem('ai_prompt_guide_dismissed') !== '1') {
+    // 9. Onboarding Guide (แสดงคำแนะนำ 3 ขั้นตอนอัตโนมัติสำหรับผู้ใช้ใหม่)
+    setTimeout(openGuideModal, 800);
   }
 
   console.log('[App] Initialised —', PROMPTS_DATA.length, 'prompts loaded');
@@ -1910,3 +1913,59 @@ function updateNavActive(view) {
     el.classList.toggle('active', el.dataset.bottomNav === view);
   });
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   QUICK GUIDE / ONBOARDING MODAL FUNCTIONS
+═══════════════════════════════════════════════════════════════ */
+function openGuideModal() {
+  const overlay = document.getElementById('guide-modal-overlay');
+  if (overlay) {
+    overlay.classList.remove('hidden');
+    const chk = document.getElementById('guide-dont-show-again');
+    if (chk) {
+      chk.checked = localStorage.getItem('ai_prompt_guide_dismissed') === '1';
+    }
+  }
+}
+
+function closeGuideModal(event) {
+  if (event && event.target !== document.getElementById('guide-modal-overlay')) return;
+  const overlay = document.getElementById('guide-modal-overlay');
+  const chk = document.getElementById('guide-dont-show-again');
+  if (chk && chk.checked) {
+    localStorage.setItem('ai_prompt_guide_dismissed', '1');
+  } else {
+    localStorage.removeItem('ai_prompt_guide_dismissed');
+  }
+  if (overlay) overlay.classList.add('hidden');
+}
+
+async function copyMasterContextPrompt(btnEl) {
+  await copyPrompt('b1_1_1');
+  if (btnEl) {
+    const originalText = btnEl.textContent;
+    btnEl.textContent = '✅ คัดลอกสำเร็จ!';
+    btnEl.classList.add('copied');
+    setTimeout(() => {
+      btnEl.textContent = originalText;
+      btnEl.classList.remove('copied');
+    }, 2000);
+  }
+}
+
+async function copyPromptAndCloseGuide() {
+  const chk = document.getElementById('guide-dont-show-again');
+  if (chk && chk.checked) {
+    localStorage.setItem('ai_prompt_guide_dismissed', '1');
+  }
+  await copyPrompt('b1_1_1');
+  const overlay = document.getElementById('guide-modal-overlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+function openPrompt11Details() {
+  const overlay = document.getElementById('guide-modal-overlay');
+  if (overlay) overlay.classList.add('hidden');
+  openPromptModal('b1_1_1');
+}
+
