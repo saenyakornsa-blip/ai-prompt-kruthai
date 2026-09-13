@@ -150,14 +150,17 @@ ALTER TABLE public.community_feedback ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Anyone can read feedback" ON public.community_feedback;
 DROP POLICY IF EXISTS "Anyone can insert feedback" ON public.community_feedback;
+DROP POLICY IF EXISTS "Authenticated users can insert feedback" ON public.community_feedback;
 
+-- ทุกคน (ทั้งสมาชิกและผู้ใช้ทั่วไป) สามารถอ่านข้อเสนอแนะได้
 CREATE POLICY "Anyone can read feedback" ON public.community_feedback
   FOR SELECT TO anon, authenticated
   USING (true);
 
-CREATE POLICY "Anyone can insert feedback" ON public.community_feedback
-  FOR INSERT TO anon, authenticated
-  WITH CHECK (message IS NOT NULL AND length(message) >= 3);
+-- สมาชิกที่เข้าสู่ระบบเท่านั้นที่มีสิทธิ์ส่งข้อเสนอแนะ
+CREATE POLICY "Authenticated users can insert feedback" ON public.community_feedback
+  FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() = user_id AND message IS NOT NULL AND length(message) >= 3);
 
 -- ============================================================
 -- RPC Functions สำหรับ Dynamic Community Dashboard (Security Definer)

@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Kanit:wght@600;700;800&display=swap" />
   </noscript>
   <!-- Supabase: loaded dynamically by app.js when config is set -->
-  <link rel="stylesheet" href="style.css?v=1.2.2" />
+  <link rel="stylesheet" href="style.css?v=1.2.3" />
 </head>
 <body class="light-mode">
 
@@ -305,50 +305,68 @@
           </div>
 
           <div class="feedback-grid">
-            <!-- Form to Submit Feedback -->
+            <!-- Form to Submit Feedback (Members only) -->
             <div class="feedback-form-card">
-              <h4>✍️ ส่งข้อเสนอแนะ / ขอ Prompt เพิ่มเติม</h4>
-              <form id="feedback-form" onsubmit="handleFeedbackSubmit(event)">
-                <div class="form-group-dash">
-                  <label for="fb-name">ชื่อของคุณครู (หรือนามแฝง):</label>
-                  <input type="text" id="fb-name" placeholder="เช่น ครูสมชาย หรือ คุณครูภาษาไทย" required maxlength="50" />
+              <!-- Guest Gate: Visible when user is not logged in -->
+              <div id="feedback-guest-gate" class="feedback-gate-box">
+                <div class="gate-icon-badge">🔒</div>
+                <h4>สิทธิพิเศษสำหรับสมาชิก</h4>
+                <p>ร่วมแบ่งปันประสบการณ์ แนะนำการใช้งาน หรือขอ Prompt เพิ่มเติมได้เมื่อเข้าสู่ระบบ</p>
+                <div class="gate-actions-row">
+                  <button class="btn-primary" onclick="openAuthModal('login')">เข้าสู่ระบบ</button>
+                  <button class="btn-secondary" onclick="openAuthModal('signup')">สมัครสมาชิกฟรี</button>
                 </div>
-                <div class="form-row-dash">
+                <div class="gate-subnote">💡 คุณครูทั่วไปสามารถอ่านข้อเสนอแนะของเพื่อนครูได้ทางด้านขวา</div>
+              </div>
+
+              <!-- Member Form: Visible when user is logged in -->
+              <div id="feedback-member-form" class="hidden">
+                <div class="member-form-header">
+                  <h4>✍️ ส่งข้อเสนอแนะ / ขอ Prompt เพิ่มเติม</h4>
+                  <span class="member-badge-pill">สมาชิก</span>
+                </div>
+                <form id="feedback-form" onsubmit="handleFeedbackSubmit(event)">
                   <div class="form-group-dash">
-                    <label for="fb-school">โรงเรียน / สังกัด / สาระการเรียนรู้:</label>
-                    <input type="text" id="fb-school" placeholder="เช่น สพป./สพม. หรือ ครูวิทยาศาสตร์" maxlength="80" />
+                    <label for="fb-name">ชื่อของคุณครู (หรือนามแฝง):</label>
+                    <input type="text" id="fb-name" placeholder="เช่น ครูสมชาย หรือ คุณครูภาษาไทย" required maxlength="50" />
+                  </div>
+                  <div class="form-row-dash">
+                    <div class="form-group-dash">
+                      <label for="fb-school">โรงเรียน / สังกัด / สาระการเรียนรู้:</label>
+                      <input type="text" id="fb-school" placeholder="เช่น สพป./สพม. หรือ ครูวิทยาศาสตร์" maxlength="80" />
+                    </div>
+                    <div class="form-group-dash">
+                      <label for="fb-category">หมวดหมู่:</label>
+                      <select id="fb-category">
+                        <option value="ข้อเสนอแนะทั่วไป">💡 ข้อเสนอแนะทั่วไป</option>
+                        <option value="ขอ Prompt เพิ่มเติม">📝 ขอ Prompt เพิ่มเติม</option>
+                        <option value="แชร์ไอเดียการนำไปใช้">🌟 แชร์ไอเดียการนำไปใช้</option>
+                        <option value="ชื่นชม & ให้กำลังใจ">❤️ ชื่นชม &amp; ให้กำลังใจ</option>
+                        <option value="แจ้งปัญหาการใช้งาน">⚠️ แจ้งปัญหาการใช้งาน</option>
+                      </select>
+                    </div>
                   </div>
                   <div class="form-group-dash">
-                    <label for="fb-category">หมวดหมู่:</label>
-                    <select id="fb-category">
-                      <option value="ข้อเสนอแนะทั่วไป">💡 ข้อเสนอแนะทั่วไป</option>
-                      <option value="ขอ Prompt เพิ่มเติม">📝 ขอ Prompt เพิ่มเติม</option>
-                      <option value="แชร์ไอเดียการนำไปใช้">🌟 แชร์ไอเดียการนำไปใช้</option>
-                      <option value="ชื่นชม & ให้กำลังใจ">❤️ ชื่นชม &amp; ให้กำลังใจ</option>
-                      <option value="แจ้งปัญหาการใช้งาน">⚠️ แจ้งปัญหาการใช้งาน</option>
-                    </select>
+                    <label>ความพึงพอใจต่อแอปพลิเคชัน:</label>
+                    <div class="star-rating-select" id="star-rating-select">
+                      <span class="star-btn active" data-rating="1" onclick="setFeedbackRating(1)">★</span>
+                      <span class="star-btn active" data-rating="2" onclick="setFeedbackRating(2)">★</span>
+                      <span class="star-btn active" data-rating="3" onclick="setFeedbackRating(3)">★</span>
+                      <span class="star-btn active" data-rating="4" onclick="setFeedbackRating(4)">★</span>
+                      <span class="star-btn active" data-rating="5" onclick="setFeedbackRating(5)">★</span>
+                      <span class="rating-label" id="rating-label">5/5 ยอดเยี่ยมมาก</span>
+                    </div>
+                    <input type="hidden" id="fb-rating" value="5" />
                   </div>
-                </div>
-                <div class="form-group-dash">
-                  <label>ความพึงพอใจต่อแอปพลิเคชัน:</label>
-                  <div class="star-rating-select" id="star-rating-select">
-                    <span class="star-btn active" data-rating="1" onclick="setFeedbackRating(1)">★</span>
-                    <span class="star-btn active" data-rating="2" onclick="setFeedbackRating(2)">★</span>
-                    <span class="star-btn active" data-rating="3" onclick="setFeedbackRating(3)">★</span>
-                    <span class="star-btn active" data-rating="4" onclick="setFeedbackRating(4)">★</span>
-                    <span class="star-btn active" data-rating="5" onclick="setFeedbackRating(5)">★</span>
-                    <span class="rating-label" id="rating-label">5/5 ยอดเยี่ยมมาก</span>
+                  <div class="form-group-dash">
+                    <label for="fb-message">ข้อความ / คำแนะนำของคุณครู:</label>
+                    <textarea id="fb-message" rows="3" placeholder="พิมพ์ข้อความแนะนำ หรือระบุ Prompt ที่ต้องการให้ทีมงานจัดทำเพิ่ม..." required minlength="3" maxlength="1000"></textarea>
                   </div>
-                  <input type="hidden" id="fb-rating" value="5" />
-                </div>
-                <div class="form-group-dash">
-                  <label for="fb-message">ข้อความ / คำแนะนำของคุณครู:</label>
-                  <textarea id="fb-message" rows="3" placeholder="พิมพ์ข้อความแนะนำ หรือระบุ Prompt ที่ต้องการให้ทีมงานจัดทำเพิ่ม..." required minlength="3" maxlength="1000"></textarea>
-                </div>
-                <button type="submit" class="btn-primary full" id="fb-submit-btn">
-                  <span>📨 ส่งข้อเสนอแนะถึงทีมพัฒนา</span>
-                </button>
-              </form>
+                  <button type="submit" class="btn-primary full" id="fb-submit-btn">
+                    <span>📨 ส่งข้อเสนอแนะถึงทีมพัฒนา</span>
+                  </button>
+                </form>
+              </div>
             </div>
 
             <!-- Feedback Feed / List -->
@@ -651,7 +669,7 @@
 <script src="data/prompts.js?v=1.2.0"></script>
 <script src="config.js?v=1.2.0"></script>
 <script src="access.js?v=1.2.0"></script>
-<script src="app.js?v=1.2.2"></script>
+<script src="app.js?v=1.2.3"></script>
 <script>
   // Fallback direct event handling for guide triggers
   document.addEventListener('click', function(e) {

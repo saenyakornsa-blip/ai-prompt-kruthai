@@ -1277,6 +1277,7 @@ function switchAuthPanel(panel) {
 async function onAuthStateChanged(user) {
   state.user = user;
   updateProfileUI(user);
+  if (typeof updateFeedbackAuthUI === 'function') updateFeedbackAuthUI();
   if (user) {
     // Logged in — remove access walls
     if (typeof onUserLoggedIn === 'function') onUserLoggedIn(user);
@@ -1794,6 +1795,9 @@ async function loadCommunityDashboard(forceRefresh = false) {
 
   // Render Charts
   renderCommunityCharts();
+
+  // Update member gate for feedback submission
+  updateFeedbackAuthUI();
 }
 
 window.loadCommunityDashboard = loadCommunityDashboard;
@@ -2097,8 +2101,35 @@ function setFeedbackRating(val) {
 
 window.setFeedbackRating = setFeedbackRating;
 
+function updateFeedbackAuthUI() {
+  const guestGate  = document.getElementById('feedback-guest-gate');
+  const memberForm = document.getElementById('feedback-member-form');
+  const nameInput  = document.getElementById('fb-name');
+  const schoolInput= document.getElementById('fb-school');
+
+  if (state.user) {
+    if (guestGate)  guestGate.classList.add('hidden');
+    if (memberForm) memberForm.classList.remove('hidden');
+    if (nameInput && !nameInput.value) {
+      nameInput.value = state.user.user_metadata?.display_name || state.user.email?.split('@')[0] || '';
+    }
+  } else {
+    if (guestGate)  guestGate.classList.remove('hidden');
+    if (memberForm) memberForm.classList.add('hidden');
+  }
+}
+
+window.updateFeedbackAuthUI = updateFeedbackAuthUI;
+
 async function handleFeedbackSubmit(event) {
   if (event) event.preventDefault();
+
+  // Guard: Only authenticated members can submit feedback
+  if (!state.user) {
+    openAuthModal('login');
+    showToast('สิทธิพิเศษสำหรับสมาชิกเท่านั้น กรุณาเข้าสู่ระบบก่อนส่งข้อเสนอแนะครับ', 'info');
+    return;
+  }
 
   const nameInput   = document.getElementById('fb-name');
   const schoolInput = document.getElementById('fb-school');
@@ -2107,7 +2138,7 @@ async function handleFeedbackSubmit(event) {
   const msgInput    = document.getElementById('fb-message');
   const submitBtn   = document.getElementById('fb-submit-btn');
 
-  const userName = (nameInput ? nameInput.value.trim() : '') || 'คุณครู';
+  const userName = (nameInput ? nameInput.value.trim() : '') || (state.user.user_metadata?.display_name || 'คุณครู');
   const roleSchool = schoolInput ? schoolInput.value.trim() : '';
   const category = catInput ? catInput.value : 'ข้อเสนอแนะทั่วไป';
   const rating = Number(ratingInput ? ratingInput.value : 5) || 5;
