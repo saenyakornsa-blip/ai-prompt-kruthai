@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Kanit:wght@600;700;800&display=swap" />
   </noscript>
   <!-- Supabase: loaded dynamically by app.js when config is set -->
-  <link rel="stylesheet" href="style.css?v=1.1.1" />
+  <link rel="stylesheet" href="style.css?v=1.2.0" />
 </head>
 <body class="light-mode">
 
@@ -124,9 +124,10 @@
       <hr class="sidebar-divider" />
       <h3 class="nav-section-label">เข้าถึงด่วน</h3>
       <button class="nav-item nav-guide-item" onclick="openGuideModal()">💡 วิธีใช้งาน (3 ขั้นตอน)</button>
+      <button class="nav-item" data-nav="community" onclick="navigateToCommunity()">🌐 แดชบอร์ดชุมชน (Live)</button>
+      <button class="nav-item" data-nav="dashboard" onclick="navigateToPersonalDashboard()">📊 สถิติของฉัน</button>
       <button class="nav-item" data-nav="map" onclick="navigateTo('map')">⚖️ Mapping กฎหมาย</button>
       <button class="nav-item" id="sidebar-master-btn" onclick="filterMaster()">⭐ Master Prompts</button>
-      <button class="nav-item" data-nav="dashboard" onclick="navigateTo('dashboard')">📊 สถิติการใช้งาน</button>
     </nav>
   </aside>
 
@@ -194,25 +195,199 @@
     </div>
 
     <div id="view-dashboard" class="view hidden">
-      <div class="view-header"><h2>📊 สถิติการใช้งาน</h2></div>
-      <div id="dashboard-guest" class="dashboard-guest">
-        <div class="guest-card">
-          <div class="guest-icon">📊</div>
-          <h3>เข้าสู่ระบบเพื่อดูสถิติ</h3>
-          <p>ติดตามว่าคุณใช้ Prompt ไหนบ่อยที่สุด<br/>วิเคราะห์รูปแบบการสอน และดูความก้าวหน้า</p>
-          <button class="btn-primary" onclick="openAuthModal('login')">เข้าสู่ระบบ</button>
-          <button class="btn-secondary" onclick="openAuthModal('signup')">สมัครสมาชิกฟรี</button>
+      <!-- Dashboard Header with Sub-tabs -->
+      <div class="dash-header-wrap">
+        <div class="view-header">
+          <h2>📊 แดชบอร์ด &amp; สถิติระบบ</h2>
+          <p class="text-muted">ข้อมูลสถิติชุมชนครูไทยแบบเรียลไทม์จากฐานข้อมูล Supabase และบันทึกสถิติส่วนบุคคล</p>
+        </div>
+        <div class="dash-tabs" role="tablist">
+          <button class="dash-tab-btn active" id="dash-tab-community-btn" onclick="switchDashboardTab('community')">
+            <span class="tab-icon">🌐</span> ภาพรวมชุมชน (Live)
+          </button>
+          <button class="dash-tab-btn" id="dash-tab-personal-btn" onclick="switchDashboardTab('personal')">
+            <span class="tab-icon">👤</span> สถิติของฉัน
+          </button>
         </div>
       </div>
-      <div id="dashboard-user" class="hidden">
-        <div class="dashboard-grid">
-          <div class="dashboard-card"><div class="d-card-icon">📋</div><div class="d-card-num" id="stat-total-copies">0</div><div class="d-card-label">Prompts ที่ copy แล้ว</div></div>
-          <div class="dashboard-card"><div class="d-card-icon">⭐</div><div class="d-card-num" id="stat-favorites">0</div><div class="d-card-label">รายการโปรด</div></div>
-          <div class="dashboard-card"><div class="d-card-icon">🔥</div><div class="d-card-num" id="stat-streak">0</div><div class="d-card-label">วันที่ใช้ต่อเนื่อง</div></div>
-          <div class="dashboard-card"><div class="d-card-icon">📚</div><div class="d-card-num" id="stat-books">0/3</div><div class="d-card-label">เล่มที่ใช้</div></div>
+
+      <!-- ======================================================= -->
+      <!-- TAB 1: COMMUNITY DYNAMIC DASHBOARD                      -->
+      <!-- ======================================================= -->
+      <div id="dash-tab-community" class="dash-tab-content">
+        <!-- Live Status Bar -->
+        <div class="live-indicator-bar">
+          <div class="live-status-info">
+            <span class="live-dot pulse"></span>
+            <span class="live-text" id="live-sync-text">เชื่อมต่อข้อมูลสดกับ Supabase เรียบร้อยแล้ว</span>
+          </div>
+          <button class="btn-refresh-dash" onclick="loadCommunityDashboard(true)" title="รีเฟรชข้อมูล">🔄 อัปเดตข้อมูลสด</button>
         </div>
-        <div class="dashboard-section"><h3>🔝 Prompts ที่ใช้บ่อย</h3><div id="top-prompts-list"></div></div>
-        <div class="dashboard-section"><h3>📅 ประวัติการใช้งาน</h3><div id="usage-history"></div></div>
+
+        <!-- 4 Key Community Metrics -->
+        <div class="dashboard-grid community-metrics-grid">
+          <div class="dashboard-card comm-card">
+            <div class="d-card-icon" style="background: rgba(79, 70, 229, 0.1); color: #4F46E5;">👥</div>
+            <div class="d-card-num" id="comm-stat-members">--</div>
+            <div class="d-card-label">คุณครูสมาชิกในระบบ</div>
+            <div class="d-card-sub text-muted">ครอบคลุมทุกกลุ่มสาระการเรียนรู้</div>
+          </div>
+          <div class="dashboard-card comm-card">
+            <div class="d-card-icon" style="background: rgba(5, 150, 105, 0.1); color: #059669;">📋</div>
+            <div class="d-card-num" id="comm-stat-copies">--</div>
+            <div class="d-card-label">ยอดคัดลอก Prompt รวม</div>
+            <div class="d-card-sub text-muted">นำไปใช้งานจริงในห้องเรียนและงานครู</div>
+          </div>
+          <div class="dashboard-card comm-card">
+            <div class="d-card-icon" style="background: rgba(245, 158, 11, 0.1); color: #D97706;">⭐</div>
+            <div class="d-card-num" id="comm-stat-favs">--</div>
+            <div class="d-card-label">บันทึกรายการโปรดรวม</div>
+            <div class="d-card-sub text-muted">Prompt ยอดฮิตที่ครูบันทึกเก็บไว้</div>
+          </div>
+          <div class="dashboard-card comm-card">
+            <div class="d-card-icon" style="background: rgba(220, 38, 38, 0.1); color: #DC2626;">💬</div>
+            <div class="d-card-num" id="comm-stat-feedback">--</div>
+            <div class="d-card-label">เสียงสะท้อน &amp; ข้อเสนอแนะ</div>
+            <div class="d-card-sub text-muted">ความคิดเห็นร่วมพัฒนาคลังสื่อ</div>
+          </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="charts-grid">
+          <!-- Chart 1: Top 10 Popular Prompts (Horizontal Bar Chart) -->
+          <div class="chart-card chart-card-wide">
+            <div class="chart-card-header">
+              <div class="chart-title-wrap">
+                <span class="chart-badge">ยอดนิยม</span>
+                <h3>🏆 10 อันดับ Prompt ที่มีคุณครูคัดลอกสูงสุด</h3>
+              </div>
+              <span class="chart-hint">💡 คลิกที่แถบเพื่อเปิด Prompt นั้นทันที</span>
+            </div>
+            <div class="chart-canvas-wrap" style="height: 340px; position: relative;">
+              <canvas id="chartTopPrompts"></canvas>
+            </div>
+          </div>
+
+          <!-- Chart 2: Book Usage Distribution (Doughnut Chart) -->
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <div class="chart-title-wrap">
+                <span class="chart-badge book-badge">สัดส่วนชุดคู่มือ</span>
+                <h3>🍩 สัดส่วนการใช้งาน 3 เล่ม</h3>
+              </div>
+            </div>
+            <div class="chart-canvas-wrap" style="height: 270px; position: relative;">
+              <canvas id="chartBookUsage"></canvas>
+            </div>
+            <div class="chart-legend-custom" id="book-usage-legend"></div>
+          </div>
+
+          <!-- Chart 3: 7-Day Usage Activity Trend (Line / Area Chart) -->
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <div class="chart-title-wrap">
+                <span class="chart-badge trend-badge">แนวโน้ม</span>
+                <h3>📈 กิจกรรมการใช้งาน 7 วันล่าสุด</h3>
+              </div>
+            </div>
+            <div class="chart-canvas-wrap" style="height: 270px; position: relative;">
+              <canvas id="chartDailyTrend"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Feedback & Suggestions System -->
+        <div class="dashboard-section community-feedback-section">
+          <div class="section-title-wrap">
+            <div class="section-badge">ร่วมพัฒนา</div>
+            <h3>💬 ข้อเสนอแนะและเสียงสะท้อนจากคุณครู</h3>
+            <p class="text-muted">ร่วมแชร์ประสบการณ์ แนะนำการใช้งาน หรือขอหัวข้อ Prompt ที่คุณครูอยากให้มีเพิ่มเติมในเวอร์ชันถัดไป</p>
+          </div>
+
+          <div class="feedback-grid">
+            <!-- Form to Submit Feedback -->
+            <div class="feedback-form-card">
+              <h4>✍️ ส่งข้อเสนอแนะ / ขอ Prompt เพิ่มเติม</h4>
+              <form id="feedback-form" onsubmit="handleFeedbackSubmit(event)">
+                <div class="form-group-dash">
+                  <label for="fb-name">ชื่อของคุณครู (หรือนามแฝง):</label>
+                  <input type="text" id="fb-name" placeholder="เช่น ครูสมชาย หรือ คุณครูภาษาไทย" required maxlength="50" />
+                </div>
+                <div class="form-row-dash">
+                  <div class="form-group-dash">
+                    <label for="fb-school">โรงเรียน / สังกัด / สาระการเรียนรู้:</label>
+                    <input type="text" id="fb-school" placeholder="เช่น สพป./สพม. หรือ ครูวิทยาศาสตร์" maxlength="80" />
+                  </div>
+                  <div class="form-group-dash">
+                    <label for="fb-category">หมวดหมู่:</label>
+                    <select id="fb-category">
+                      <option value="ข้อเสนอแนะทั่วไป">💡 ข้อเสนอแนะทั่วไป</option>
+                      <option value="ขอ Prompt เพิ่มเติม">📝 ขอ Prompt เพิ่มเติม</option>
+                      <option value="แชร์ไอเดียการนำไปใช้">🌟 แชร์ไอเดียการนำไปใช้</option>
+                      <option value="ชื่นชม & ให้กำลังใจ">❤️ ชื่นชม &amp; ให้กำลังใจ</option>
+                      <option value="แจ้งปัญหาการใช้งาน">⚠️ แจ้งปัญหาการใช้งาน</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group-dash">
+                  <label>ความพึงพอใจต่อแอปพลิเคชัน:</label>
+                  <div class="star-rating-select" id="star-rating-select">
+                    <span class="star-btn active" data-rating="1" onclick="setFeedbackRating(1)">★</span>
+                    <span class="star-btn active" data-rating="2" onclick="setFeedbackRating(2)">★</span>
+                    <span class="star-btn active" data-rating="3" onclick="setFeedbackRating(3)">★</span>
+                    <span class="star-btn active" data-rating="4" onclick="setFeedbackRating(4)">★</span>
+                    <span class="star-btn active" data-rating="5" onclick="setFeedbackRating(5)">★</span>
+                    <span class="rating-label" id="rating-label">5/5 ยอดเยี่ยมมาก</span>
+                  </div>
+                  <input type="hidden" id="fb-rating" value="5" />
+                </div>
+                <div class="form-group-dash">
+                  <label for="fb-message">ข้อความ / คำแนะนำของคุณครู:</label>
+                  <textarea id="fb-message" rows="3" placeholder="พิมพ์ข้อความแนะนำ หรือระบุ Prompt ที่ต้องการให้ทีมงานจัดทำเพิ่ม..." required minlength="3" maxlength="1000"></textarea>
+                </div>
+                <button type="submit" class="btn-primary full" id="fb-submit-btn">
+                  <span>📨 ส่งข้อเสนอแนะถึงทีมพัฒนา</span>
+                </button>
+              </form>
+            </div>
+
+            <!-- Feedback Feed / List -->
+            <div class="feedback-feed-card">
+              <div class="feed-header">
+                <h4>🌟 เสียงสะท้อนล่าสุดจากเพื่อนครู</h4>
+                <span class="feed-count-badge" id="feedback-feed-count">0 ข้อความ</span>
+              </div>
+              <div class="feedback-items-container" id="feedback-items-container">
+                <div class="loading-state-dash">กำลังโหลดข้อเสนอแนะ...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================= -->
+      <!-- TAB 2: MY PERSONAL STATS (USER / GUEST DASHBOARD)       -->
+      <!-- ======================================================= -->
+      <div id="dash-tab-personal" class="dash-tab-content hidden">
+        <div id="dashboard-guest" class="dashboard-guest">
+          <div class="guest-card">
+            <div class="guest-icon">📊</div>
+            <h3>เข้าสู่ระบบเพื่อดูสถิติส่วนบุคคล</h3>
+            <p>ติดตามว่าคุณใช้ Prompt ไหนบ่อยที่สุด<br/>วิเคราะห์รูปแบบการทำงาน และดูประวัติการใช้งานของคุณ</p>
+            <button class="btn-primary" onclick="openAuthModal('login')">เข้าสู่ระบบ</button>
+            <button class="btn-secondary" onclick="openAuthModal('signup')">สมัครสมาชิกฟรี</button>
+          </div>
+        </div>
+        <div id="dashboard-user" class="hidden">
+          <div class="dashboard-grid">
+            <div class="dashboard-card"><div class="d-card-icon">📋</div><div class="d-card-num" id="stat-total-copies">0</div><div class="d-card-label">Prompts ที่ copy แล้ว</div></div>
+            <div class="dashboard-card"><div class="d-card-icon">⭐</div><div class="d-card-num" id="stat-favorites">0</div><div class="d-card-label">รายการโปรด</div></div>
+            <div class="dashboard-card"><div class="d-card-icon">🔥</div><div class="d-card-num" id="stat-streak">0</div><div class="d-card-label">วันที่ใช้ต่อเนื่อง</div></div>
+            <div class="dashboard-card"><div class="d-card-icon">📚</div><div class="d-card-num" id="stat-books">0/3</div><div class="d-card-label">เล่มที่ใช้</div></div>
+          </div>
+          <div class="dashboard-section"><h3>🔝 Prompts ที่คุณใช้บ่อย</h3><div id="top-prompts-list"></div></div>
+          <div class="dashboard-section"><h3>📅 ประวัติการใช้งานของคุณ</h3><div id="usage-history"></div></div>
+        </div>
       </div>
     </div>
 
@@ -472,10 +647,11 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="data/prompts.js?v=1.1.0"></script>
-<script src="config.js?v=1.1.0"></script>
-<script src="access.js?v=1.1.0"></script>
-<script src="app.js?v=1.1.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="data/prompts.js?v=1.2.0"></script>
+<script src="config.js?v=1.2.0"></script>
+<script src="access.js?v=1.2.0"></script>
+<script src="app.js?v=1.2.0"></script>
 <script>
   // Fallback direct event handling for guide triggers
   document.addEventListener('click', function(e) {

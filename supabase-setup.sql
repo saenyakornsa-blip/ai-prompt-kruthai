@@ -130,3 +130,102 @@ WITH (security_invoker = true) AS
     COUNT(*) as total_reviews
   FROM public.prompt_ratings
   GROUP BY prompt_id;
+
+-- ============================================================
+-- ตาราง: ข้อเสนอแนะและเสียงสะท้อนจากชุมชนครู (Community Feedback)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.community_feedback (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  user_name TEXT NOT NULL,
+  role_or_school TEXT,
+  category TEXT DEFAULT 'ข้อเสนอแนะทั่วไป', -- 'ข้อเสนอแนะทั่วไป', 'ขอ Prompt เพิ่มเติม', 'แชร์ไอเดีย', 'ชื่นชม & ให้กำลังใจ'
+  message TEXT NOT NULL,
+  rating INTEGER DEFAULT 5 CHECK (rating >= 1 AND rating <= 5),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  is_featured BOOLEAN DEFAULT false
+);
+
+ALTER TABLE public.community_feedback ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can read feedback" ON public.community_feedback;
+DROP POLICY IF EXISTS "Anyone can insert feedback" ON public.community_feedback;
+
+CREATE POLICY "Anyone can read feedback" ON public.community_feedback
+  FOR SELECT TO anon, authenticated
+  USING (true);
+
+CREATE POLICY "Anyone can insert feedback" ON public.community_feedback
+  FOR INSERT TO anon, authenticated
+  WITH CHECK (message IS NOT NULL AND length(message) >= 3);
+
+-- ============================================================
+-- RPC Functions สำหรับ Dynamic Community Dashboard (Security Definer)
+-- ============================================================
+
+-- 1. ภาพรวมตัวเลขสถิติทั้งระบบ
+CREATE OR REPLACE FUNCTION public.get_community_overview()
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  result json;
+BEGIN
+  SELECT json_build_object(
+    'total_members', (SELECT count(*) FROM public.profiles),
+    'total_copies', (SELECT count(*) FROM public.copy_events),
+    'total_favorites', (SELECT count(*) FROM public.favorites),
+    'total_feedback', (SELECT count(*) FROM public.community_feedback)
+  ) INTO result;
+  RETURN result;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_community_overview() TO anon, authenticated;
+
+-- 2. ดึง 10 อันดับ Prompt ที่มีการ Copy มากที่สุด
+CREATE OR REPLACE FUNCTION public.get_top_prompts(limit_count int DEFAULT 10)
+RETURNS TABLE (prompt_id text, total_copies bigint)
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  SELECT prompt_id, count(*) as total_copies
+  FROM public.copy_events
+  GROUP BY prompt_id
+  ORDER BY total_copies DESC
+  LIMIT limit_count;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_top_prompts(int) TO anon, authenticated;
+
+-- 3. สถิติการใช้งานแยกตาม 3 เล่ม (Book 1, 2, 3)
+CREATE OR REPLACE FUNCTION public.get_book_usage_stats()
+RETURNS TABLE (book_number int, total_copies bigint)
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  SELECT book_number, count(*) as total_copies
+  FROM public.copy_events
+  WHERE book_number IS NOT NULL
+  GROUP BY book_number
+  ORDER BY book_number;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_book_usage_stats() TO anon, authenticated;
+
+-- 4. สถิติกิจกรรมย้อนหลัง 7 วัน (Daily activity)
+CREATE OR REPLACE FUNCTION public.get_daily_usage_stats(days_back int DEFAULT 7)
+RETURNS TABLE (usage_date date, copy_count bigint)
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  SELECT date_trunc('day', copied_at)::date as usage_date, count(*) as copy_count
+  FROM public.copy_events
+  WHERE copied_at >= (NOW() - (days_back || ' days')::interval)
+  GROUP BY usage_date
+  ORDER BY usage_date ASC;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_daily_usage_stats(int) TO anon, authenticated;
+
