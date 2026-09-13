@@ -2027,49 +2027,7 @@ async function loadCommunityFeedback() {
     }
   });
 
-  // If no feedback yet, provide high-quality default sample feedbacks from teachers
-  if (merged.length === 0) {
-    merged.push(
-      {
-        id: 'mock-1',
-        user_name: 'ครูวรัญญา',
-        role_or_school: 'ครูภาษาไทย • สพป.ขอนแก่น',
-        category: 'ชื่นชม & ให้กำลังใจ',
-        rating: 5,
-        message: 'นำ Master Prompt และ Prompt ออกแบบแผนไปใช้ ลดเวลาทำแผนจาก 3 วันเหลือไม่ถึงชั่วโมง ช่วยชีวิตครูได้จริงๆ ค่ะ',
-        created_at: new Date(Date.now() - 3600000 * 5).toISOString()
-      },
-      {
-        id: 'mock-2',
-        user_name: 'ครูธนภัทร',
-        role_or_school: 'ครูวิทยาศาสตร์ • สพม.เชียงใหม่',
-        category: 'แชร์ไอเดียการนำไปใช้',
-        rating: 5,
-        message: 'Prompt ออกข้อสอบ HOTS ตาม Bloom\'s Taxonomy ดีมากๆ ครับ แนะนำให้คุณครูคัดลอก Master Prompt ใส่ก่อนเสมอ ข้อสอบที่ได้จะตรงตัวชี้วัดเป๊ะเลย',
-        created_at: new Date(Date.now() - 3600000 * 18).toISOString()
-      },
-      {
-        id: 'mock-3',
-        user_name: 'ครูสุภาภรณ์',
-        role_or_school: 'กลุ่มสาระคณิตศาสตร์ • กทม.',
-        category: 'ขอ Prompt เพิ่มเติม',
-        rating: 5,
-        message: 'อยากให้ทีมงานเพิ่ม Prompt สร้างสถานการณ์ปัญหาแบบ STEM และเกณฑ์ประเมินสมรรถนะผู้เรียนตามหลักสูตรใหม่เพิ่มเติมในเวอร์ชันหน้าค่ะ',
-        created_at: new Date(Date.now() - 3600000 * 36).toISOString()
-      },
-      {
-        id: 'mock-4',
-        user_name: 'ครูอนุสรณ์',
-        role_or_school: 'ครูสังคมศึกษา • สพม.นครราชสีมา',
-        category: 'ข้อเสนอแนะทั่วไป',
-        rating: 5,
-        message: 'การร่างแบบ วPA และ CAR ในเล่ม 3 ประหยัดเวลาไปได้เยอะมาก เป็นคลังเครื่องมือที่ทรงคุณค่าสำหรับครูไทยอย่างแท้จริงครับ',
-        created_at: new Date(Date.now() - 3600000 * 50).toISOString()
-      }
-    );
-  }
-
-  // Render to DOM
+  // If no feedback in database, show clean empty state
   const container = document.getElementById('feedback-items-container');
   const countBadge = document.getElementById('feedback-feed-count');
 
@@ -2078,6 +2036,17 @@ async function loadCommunityFeedback() {
   }
 
   if (container) {
+    if (merged.length === 0) {
+      container.innerHTML = `
+        <div class="loading-state-dash" style="padding: 40px 16px; text-align: center;">
+          <div style="font-size: 36px; margin-bottom: 10px;">💌</div>
+          <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px; color: var(--text);">ยังไม่มีข้อเสนอแนะในระบบ</div>
+          <div style="color: var(--text-muted); font-size: 12.5px; line-height: 1.5;">ร่วมเป็นคุณครูท่านแรกที่ส่งความคิดเห็น ให้คะแนนดาว หรือขอ Prompt ที่ต้องการเพิ่มเติมผ่านฟอร์มได้เลยครับ ✨</div>
+        </div>
+      `;
+      return merged;
+    }
+
     container.innerHTML = merged.map(item => {
       const stars = '★'.repeat(item.rating || 5) + '☆'.repeat(5 - (item.rating || 5));
       const timeAgo = formatTimeAgo(item.created_at);
