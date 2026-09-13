@@ -163,7 +163,23 @@ CREATE POLICY "Anyone can insert feedback" ON public.community_feedback
 -- RPC Functions สำหรับ Dynamic Community Dashboard (Security Definer)
 -- ============================================================
 
--- 1. ภาพรวมตัวเลขสถิติทั้งระบบ
+-- ซิงค์ผู้ใช้ทุกคนใน auth.users เข้าตาราง profiles (เพื่อไม่ให้ตกหล่น)
+INSERT INTO public.profiles (id, display_name)
+SELECT 
+  id, 
+  COALESCE(raw_user_meta_data->>'display_name', split_part(email, '@', 1))
+FROM auth.users
+ON CONFLICT (id) DO NOTHING;
+
+-- อนุญาตให้ทุกคนอ่านโปรไฟล์สาธารณะและนับจำนวนสมาชิกได้
+DROP POLICY IF EXISTS "Anyone can read public profiles" ON public.profiles;
+CREATE POLICY "Anyone can read public profiles" ON public.profiles FOR SELECT TO anon, authenticated USING (true);
+
+-- อนุญาตให้อ่านประวัติการคัดลอกรวมเพื่อวาดกราฟและคำนวณสถิติ
+DROP POLICY IF EXISTS "Anyone can read copy events" ON public.copy_events;
+CREATE POLICY "Anyone can read copy events" ON public.copy_events FOR SELECT TO anon, authenticated USING (true);
+
+-- 1. ภาพรวมตัวเลขสถิติทั้งระบบ (อ่านตรงจาก auth.users สมาชิกจริง)
 CREATE OR REPLACE FUNCTION public.get_community_overview()
 RETURNS json
 LANGUAGE plpgsql
@@ -173,7 +189,7 @@ DECLARE
   result json;
 BEGIN
   SELECT json_build_object(
-    'total_members', (SELECT count(*) FROM public.profiles),
+    'total_members', (SELECT count(*) FROM auth.users),
     'total_copies', (SELECT count(*) FROM public.copy_events),
     'total_favorites', (SELECT count(*) FROM public.favorites),
     'total_feedback', (SELECT count(*) FROM public.community_feedback)
