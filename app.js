@@ -178,6 +178,7 @@ function filterByBook(bookNum) {
   if (state.currentView !== 'home') navigateTo('home');
   state.activeBook    = bookNum;
   state.activeChapter = null;
+  state.isMasterOnly  = false;
   state.currentPage   = 1;
   updateSidebarActive();
   applySortAndFilter();
@@ -187,7 +188,18 @@ function filterByChapter(bookNum, chapterNum) {
   if (state.currentView !== 'home') navigateTo('home');
   state.activeBook    = bookNum;
   state.activeChapter = chapterNum;
+  state.isMasterOnly  = false;
   state.currentPage   = 1;
+
+  // กางเมนูบทของเล่มนี้ออกมา
+  const chapters = document.getElementById('chapters-' + bookNum);
+  const chevron  = document.querySelector('[data-book="' + bookNum + '"] .chevron');
+  if (chapters) chapters.style.display = 'block';
+  if (chevron) {
+    chevron.textContent = '▾';
+    chevron.classList.add('open');
+  }
+
   updateSidebarActive();
   applySortAndFilter();
 }
@@ -213,13 +225,23 @@ function filterByTag(tag) {
 function filterMaster() {
   if (state.currentView !== 'home') navigateTo('home');
   state.isMasterOnly = !state.isMasterOnly;
-  state.currentPage  = 1;
-  const btn = document.getElementById('master-filter-btn');
-  if (btn) btn.classList.toggle('active', state.isMasterOnly);
+  if (state.isMasterOnly) {
+    state.activeBook    = null;
+    state.activeChapter = null;
+    // ปิดเมนูย่อยของทุกเล่ม
+    [1, 2, 3].forEach(function(b) {
+      const ch = document.getElementById('chapters-' + b);
+      const cv = document.querySelector('[data-book="' + b + '"] .chevron');
+      if (ch) ch.style.display = 'none';
+      if (cv) { cv.textContent = '▸'; cv.classList.remove('open'); }
+    });
+  }
+  state.currentPage = 1;
+  updateSidebarActive();
   applySortAndFilter();
 }
 
-// Toggle chapter sub-menu expand/collapse in sidebar
+// ควบคุมการกาง/พับเมนูบทในแถบซ้าย และกรองตามเล่ม
 function toggleBook(bookNum) {
   if (state.currentView !== 'home') navigateTo('home');
   const chapters = document.getElementById('chapters-' + bookNum);
@@ -230,40 +252,67 @@ function toggleBook(bookNum) {
     return;
   }
 
-  const isOpen = chapters.style.display !== 'none' && chapters.style.display !== '';
+  const isCurrentlyOpen = chapters.style.display === 'block';
 
-  // Close all other chapter menus first
+  // พับเก็บเล่มอื่น
   [1, 2, 3].forEach(function(b) {
-    const ch = document.getElementById('chapters-' + b);
-    const cv = document.querySelector('[data-book="' + b + '"] .chevron');
-    if (ch) ch.style.display = 'none';
-    if (cv) cv.textContent = '▸';
+    if (b !== bookNum) {
+      const ch = document.getElementById('chapters-' + b);
+      const cv = document.querySelector('[data-book="' + b + '"] .chevron');
+      if (ch) ch.style.display = 'none';
+      if (cv) { cv.textContent = '▸'; cv.classList.remove('open'); }
+    }
   });
 
-  if (!isOpen) {
+  if (!isCurrentlyOpen) {
+    // กางบทออก และกรองดูเฉพาะเล่มนี้
     chapters.style.display = 'block';
-    if (chevron) chevron.textContent = '▾';
+    if (chevron) {
+      chevron.textContent = '▾';
+      chevron.classList.add('open');
+    }
     filterByBook(bookNum);
   } else {
+    // หากกดซ้ำเล่มเดิม ให้พับเก็บ และกลับไปดูทั้งหมด
+    chapters.style.display = 'none';
+    if (chevron) {
+      chevron.textContent = '▸';
+      chevron.classList.remove('open');
+    }
     filterByBook(null);
   }
 }
 
-// Highlight active item in sidebar
+// อัปเดตการแสดงผลไฮไลต์ของปุ่มใน Sidebar
 function updateSidebarActive() {
-  // Highlight "ทั้งหมด"
+  const isAll = state.activeBook === null && state.activeChapter === null && !state.isMasterOnly;
+
+  // ไฮไลต์ "ทั้งหมด"
   document.querySelectorAll('[data-filter="all"]').forEach(function(el) {
-    el.classList.toggle('active', state.activeBook === null && state.activeChapter === null);
+    el.classList.toggle('active', isAll);
   });
-  // Highlight active book header
+
+  // ไฮไลต์เล่ม
   [1, 2, 3].forEach(function(b) {
     const header = document.querySelector('[data-book="' + b + '"] .nav-book-header');
-    if (header) header.classList.toggle('active', state.activeBook === b);
+    if (header) {
+      header.classList.toggle('active', state.activeBook === b && !state.isMasterOnly);
+    }
   });
-  // Highlight active chapter button
+
+  // ไฮไลต์บท
   document.querySelectorAll('.nav-chapter').forEach(function(btn) {
-    btn.classList.remove('active');
+    const b = Number(btn.dataset.book);
+    const c = Number(btn.dataset.chapter);
+    const isAct = state.activeBook === b && state.activeChapter === c && !state.isMasterOnly;
+    btn.classList.toggle('active', isAct);
   });
+
+  // ไฮไลต์ Master Prompts
+  const masterBtn = document.getElementById('sidebar-master-btn');
+  if (masterBtn) {
+    masterBtn.classList.toggle('active', !!state.isMasterOnly);
+  }
 }
 
 function applySortAndFilter() {
@@ -1411,28 +1460,7 @@ function renderTagsBar() {
   ].join('');
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   20. SIDEBAR BOOK TOGGLE
-═══════════════════════════════════════════════════════════════ */
-function toggleBook(bookNum) {
-  const chapters = document.getElementById(`chapters-${bookNum}`);
-  const chevron  = document.getElementById(`chevron-${bookNum}`);
-  if (!chapters) return;
-  const isHidden = chapters.classList.toggle('hidden');
-  if (chevron) chevron.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(90deg)';
-}
 
-function updateSidebarActive() {
-  document.querySelectorAll('.sidebar-book-item').forEach(el => {
-    el.classList.toggle('active', Number(el.dataset.book) === state.activeBook);
-  });
-  document.querySelectorAll('.sidebar-chapter-item').forEach(el => {
-    el.classList.toggle('active',
-      Number(el.dataset.book) === state.activeBook &&
-      Number(el.dataset.chapter) === state.activeChapter
-    );
-  });
-}
 
 /* ═══════════════════════════════════════════════════════════════
    21. DASHBOARD

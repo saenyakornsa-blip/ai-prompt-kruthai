@@ -1717,9 +1717,12 @@ body.dark-mode .copy-gate-benefits span {
 
 /* Sidebar Nav Guide item */
 .nav-guide-item {
-  color: var(--primary) !important;
-  font-weight: 700 !important;
-  background: rgba(79, 70, 229, 0.08) !important;
+  color: var(--primary);
+  font-weight: 600;
+}
+.nav-guide-item:hover {
+  background: var(--primary-light);
+  color: var(--primary);
 }
 
 /* Hero Guide Banner */
