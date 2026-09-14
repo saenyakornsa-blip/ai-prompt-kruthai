@@ -2495,11 +2495,61 @@ body.dark-mode .feedback-item {
   white-space: pre-line;
 }
 
+.fb-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.06);
+}
+
+body.dark-mode .fb-footer {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+.fb-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.fb-btn-action {
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fb-btn-action:hover {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.fb-btn-action.edit:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.fb-btn-action.delete:hover {
+  color: #DC2626;
+  border-color: #DC2626;
+  background: rgba(220, 38, 38, 0.08);
+}
+
 .fb-time {
   font-size: 11px;
   color: var(--text-muted);
-  text-align: right;
-  margin-top: 4px;
 }
 
 .loading-state-dash {

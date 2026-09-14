@@ -13,7 +13,7 @@
   <noscript>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Kanit:wght@600;700;800&display=swap" />
   </noscript>
-  <link rel="stylesheet" href="style.css?v=1.3.1" />
+  <link rel="stylesheet" href="style.css?v=1.3.3" />
 </head>
 <body class="light-mode">
 
@@ -655,6 +655,51 @@
   </div>
 </div>
 
+<!-- EDIT FEEDBACK MODAL -->
+<div class="modal-overlay hidden" id="edit-feedback-modal-overlay" onclick="closeEditFeedbackModal(event)">
+  <div class="modal auth-modal" id="edit-feedback-modal" style="max-width: 500px;">
+    <button class="modal-close" onclick="closeEditFeedbackModal()">✕</button>
+    <div class="auth-header">
+      <div class="auth-logo">✏️</div>
+      <h2>แก้ไขข้อเสนอแนะ</h2>
+      <p>ปรับปรุงข้อความหรือคะแนนความพึงพอใจ</p>
+    </div>
+    <form id="edit-feedback-form" onsubmit="handleFeedbackEditSubmit(event)">
+      <input type="hidden" id="edit-fb-id" />
+      <div class="form-group-dash" style="margin-bottom: 12px;">
+        <label for="edit-fb-category">หมวดหมู่:</label>
+        <select id="edit-fb-category" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13.5px; background: var(--card-bg); color: var(--text);">
+          <option value="ข้อเสนอแนะทั่วไป">💡 ข้อเสนอแนะทั่วไป</option>
+          <option value="ขอ Prompt เพิ่มเติม">📝 ขอ Prompt เพิ่มเติม</option>
+          <option value="แชร์ไอเดียการนำไปใช้">🌟 แชร์ไอเดียการนำไปใช้</option>
+          <option value="ชื่นชม & ให้กำลังใจ">❤️ ชื่นชม &amp; ให้กำลังใจ</option>
+          <option value="แจ้งปัญหาการใช้งาน">⚠️ แจ้งปัญหาการใช้งาน</option>
+        </select>
+      </div>
+      <div class="form-group-dash" style="margin-bottom: 12px;">
+        <label>ความพึงพอใจ:</label>
+        <div class="star-rating-select" id="edit-star-rating-select">
+          <span class="star-btn active" data-rating="1" onclick="setEditFeedbackRating(1)">★</span>
+          <span class="star-btn active" data-rating="2" onclick="setEditFeedbackRating(2)">★</span>
+          <span class="star-btn active" data-rating="3" onclick="setEditFeedbackRating(3)">★</span>
+          <span class="star-btn active" data-rating="4" onclick="setEditFeedbackRating(4)">★</span>
+          <span class="star-btn active" data-rating="5" onclick="setEditFeedbackRating(5)">★</span>
+          <span class="rating-label" id="edit-rating-label">5/5 ยอดเยี่ยมมาก</span>
+        </div>
+        <input type="hidden" id="edit-fb-rating" value="5" />
+      </div>
+      <div class="form-group-dash" style="margin-bottom: 16px;">
+        <label for="edit-fb-message">ข้อความของคุณครู:</label>
+        <textarea id="edit-fb-message" rows="4" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 13.5px; background: var(--card-bg); color: var(--text); resize: vertical; box-sizing: border-box;" required minlength="3" maxlength="1000"></textarea>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button type="button" class="btn-secondary" onclick="closeEditFeedbackModal()" style="padding: 9px 18px;">ยกเลิก</button>
+        <button type="submit" class="btn-primary" id="edit-fb-submit-btn" style="padding: 9px 20px;">บันทึกการแก้ไข</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div id="toast-container" class="toast-container"></div>
 <div class="mobile-search-overlay hidden" id="mobile-search-overlay">
   <div class="mobile-search-inner">
@@ -666,10 +711,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="data/prompts.js?v=1.2.0"></script>
-<script src="config.js?v=1.3.2"></script>
-<script src="access.js?v=1.3.2"></script>
-<script src="app.js?v=1.3.2"></script>
-<script src="chatbot.js?v=1.3.2"></script>
+<script src="config.js?v=1.3.3"></script>
+<script src="access.js?v=1.3.3"></script>
+<script src="app.js?v=1.3.3"></script>
+<script src="chatbot.js?v=1.3.3"></script>
 <script>
   // Fallback direct event handling for guide triggers
   document.addEventListener('click', function(e) {

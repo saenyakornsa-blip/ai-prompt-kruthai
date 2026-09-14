@@ -2051,13 +2051,16 @@ async function loadCommunityFeedback() {
       return merged;
     }
 
-    container.innerHTML = merged.map(item => {
+    window._cachedCommunityFeedback = merged;
+
+    container.innerHTML = merged.map((item, idx) => {
       const stars = '★'.repeat(item.rating || 5) + '☆'.repeat(5 - (item.rating || 5));
       const timeAgo = formatTimeAgo(item.created_at);
       const cat = item.category || 'ข้อเสนอแนะทั่วไป';
+      const isOwner = state.user && item.user_id && (String(state.user.id) === String(item.user_id));
 
       return `
-        <div class="feedback-item">
+        <div class="feedback-item" id="feedback-card-${item.id || idx}">
           <div class="fb-item-top">
             <div>
               <div class="fb-author">คุณ${escapeHtml(item.user_name)}</div>
@@ -2067,7 +2070,15 @@ async function loadCommunityFeedback() {
           </div>
           <span class="fb-category-chip">${escapeHtml(cat)}</span>
           <div class="fb-message">${escapeHtml(item.message)}</div>
-          <div class="fb-time">${timeAgo}</div>
+          <div class="fb-footer">
+            <div class="fb-time">${timeAgo}</div>
+            ${isOwner ? `
+              <div class="fb-actions">
+                <button type="button" class="fb-btn-action edit" onclick="openEditFeedbackModal('${item.id || idx}')" title="แก้ไขข้อความนี้">✏️ แก้ไข</button>
+                <button type="button" class="fb-btn-action delete" onclick="deleteCommunityFeedback('${item.id || idx}')" title="ลบข้อความนี้">🗑️ ลบ</button>
+              </div>
+            ` : ''}
+          </div>
         </div>
       `;
     }).join('');
@@ -2160,6 +2171,7 @@ async function handleFeedbackSubmit(event) {
     category: category,
     rating: rating,
     message: message,
+    user_id: state.user ? state.user.id : null,
     created_at: new Date().toISOString()
   };
 
@@ -2210,6 +2222,203 @@ async function handleFeedbackSubmit(event) {
 }
 
 window.handleFeedbackSubmit = handleFeedbackSubmit;
+
+/* ─── Feedback Edit & Delete Actions ─── */
+function setEditFeedbackRating(val) {
+  const ratingInput = document.getElementById('edit-fb-rating');
+  if (ratingInput) ratingInput.value = val;
+
+  const stars = document.querySelectorAll('#edit-star-rating-select .star-btn');
+  stars.forEach(s => {
+    const starVal = Number(s.dataset.rating);
+    s.classList.toggle('active', starVal <= val);
+  });
+
+  const label = document.getElementById('edit-rating-label');
+  if (label) {
+    const texts = {
+      1: '1/5 ต้องปรับปรุง',
+      2: '2/5 พอใช้',
+      3: '3/5 ปานกลาง',
+      4: '4/5 ดีมาก',
+      5: '5/5 ยอดเยี่ยมมาก'
+    };
+    label.textContent = texts[val] || `${val}/5`;
+  }
+}
+window.setEditFeedbackRating = setEditFeedbackRating;
+
+function openEditFeedbackModal(feedbackId) {
+  if (!state.user) {
+    showToast('กรุณาเข้าสู่ระบบก่อนแก้ไขข้อเสนอแนะครับ', 'info');
+    return;
+  }
+
+  const list = window._cachedCommunityFeedback || [];
+  const item = list.find(f => String(f.id) === String(feedbackId)) || list[Number(feedbackId)];
+  if (!item) {
+    showToast('ไม่พบข้อมูลข้อเสนอแนะที่ต้องการแก้ไข', 'error');
+    return;
+  }
+
+  // Verify ownership
+  if (item.user_id && String(item.user_id) !== String(state.user.id)) {
+    showToast('คุณครูสามารถแก้ไขได้เฉพาะข้อความของตนเองเท่านั้นครับ', 'error');
+    return;
+  }
+
+  const modalOverlay = document.getElementById('edit-feedback-modal-overlay');
+  const idInput = document.getElementById('edit-fb-id');
+  const catInput = document.getElementById('edit-fb-category');
+  const msgInput = document.getElementById('edit-fb-message');
+
+  if (idInput) idInput.value = item.id || feedbackId;
+  if (catInput) catInput.value = item.category || 'ข้อเสนอแนะทั่วไป';
+  if (msgInput) msgInput.value = item.message || '';
+  setEditFeedbackRating(item.rating || 5);
+
+  if (modalOverlay) {
+    modalOverlay.classList.remove('hidden');
+    setTimeout(() => {
+      msgInput?.focus();
+    }, 100);
+  }
+}
+window.openEditFeedbackModal = openEditFeedbackModal;
+
+function closeEditFeedbackModal(event) {
+  if (event && event.target !== document.getElementById('edit-feedback-modal-overlay')) {
+    return;
+  }
+  const modalOverlay = document.getElementById('edit-feedback-modal-overlay');
+  if (modalOverlay) modalOverlay.classList.add('hidden');
+}
+window.closeEditFeedbackModal = closeEditFeedbackModal;
+
+async function handleFeedbackEditSubmit(event) {
+  if (event) event.preventDefault();
+
+  if (!state.user) {
+    showToast('กรุณาเข้าสู่ระบบก่อนทำการแก้ไข', 'info');
+    return;
+  }
+
+  const idInput = document.getElementById('edit-fb-id');
+  const catInput = document.getElementById('edit-fb-category');
+  const ratingInput = document.getElementById('edit-fb-rating');
+  const msgInput = document.getElementById('edit-fb-message');
+  const submitBtn = document.getElementById('edit-fb-submit-btn');
+
+  const feedbackId = idInput?.value;
+  const newCat = catInput?.value || 'ข้อเสนอแนะทั่วไป';
+  const newRating = Number(ratingInput?.value || 5);
+  const newMsg = msgInput?.value.trim() || '';
+
+  if (!newMsg || newMsg.length < 3) {
+    showToast('กรุณาระบุข้อความอย่างน้อย 3 ตัวอักษร', 'info');
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'กำลังบันทึก...';
+  }
+
+  let updatedSuccess = false;
+
+  // 1. Update on Supabase if connected
+  if (_sb) {
+    try {
+      const { error } = await _sb
+        .from('community_feedback')
+        .update({
+          category: newCat,
+          rating: newRating,
+          message: newMsg
+        })
+        .eq('id', feedbackId)
+        .eq('user_id', state.user.id);
+
+      if (!error) {
+        updatedSuccess = true;
+      } else {
+        console.warn('[CommunityDash] update feedback in supabase failed:', error);
+      }
+    } catch (e) {
+      console.warn('[CommunityDash] update feedback exception:', e);
+    }
+  }
+
+  // 2. Update local storage
+  try {
+    const local = JSON.parse(localStorage.getItem(LOCAL_FEEDBACK_KEY) || '[]');
+    const idx = local.findIndex(f => String(f.id) === String(feedbackId));
+    if (idx !== -1) {
+      local[idx].category = newCat;
+      local[idx].rating = newRating;
+      local[idx].message = newMsg;
+      localStorage.setItem(LOCAL_FEEDBACK_KEY, JSON.stringify(local));
+      updatedSuccess = true;
+    }
+  } catch {}
+
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'บันทึกการแก้ไข';
+  }
+
+  closeEditFeedbackModal();
+  showToast('แก้ไขข้อเสนอแนะเรียบร้อยแล้ว ✨', 'success');
+  await loadCommunityFeedback();
+}
+window.handleFeedbackEditSubmit = handleFeedbackEditSubmit;
+
+async function deleteCommunityFeedback(feedbackId) {
+  if (!state.user) {
+    showToast('กรุณาเข้าสู่ระบบก่อนดำเนินการ', 'info');
+    return;
+  }
+
+  if (!confirm('คุณครูต้องการลบข้อเสนอแนะข้อความนี้ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้')) {
+    return;
+  }
+
+  let deletedSuccess = false;
+
+  // 1. Delete on Supabase if connected
+  if (_sb) {
+    try {
+      const { error } = await _sb
+        .from('community_feedback')
+        .delete()
+        .eq('id', feedbackId)
+        .eq('user_id', state.user.id);
+
+      if (!error) {
+        deletedSuccess = true;
+      } else {
+        console.warn('[CommunityDash] delete feedback from supabase error:', error);
+      }
+    } catch (e) {
+      console.warn('[CommunityDash] delete feedback exception:', e);
+    }
+  }
+
+  // 2. Delete from localStorage
+  try {
+    let local = JSON.parse(localStorage.getItem(LOCAL_FEEDBACK_KEY) || '[]');
+    const origLen = local.length;
+    local = local.filter(f => String(f.id) !== String(feedbackId));
+    if (local.length < origLen) {
+      localStorage.setItem(LOCAL_FEEDBACK_KEY, JSON.stringify(local));
+      deletedSuccess = true;
+    }
+  } catch {}
+
+  showToast('ลบข้อเสนอแนะเรียบร้อยแล้ว', 'info');
+  await loadCommunityFeedback();
+}
+window.deleteCommunityFeedback = deleteCommunityFeedback;
 
 /* ─── Personal Dashboard ─── */
 async function loadPersonalDashboard() {

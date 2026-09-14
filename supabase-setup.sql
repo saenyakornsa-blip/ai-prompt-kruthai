@@ -162,6 +162,19 @@ CREATE POLICY "Authenticated users can insert feedback" ON public.community_feed
   FOR INSERT TO authenticated
   WITH CHECK (auth.uid() = user_id AND message IS NOT NULL AND length(message) >= 3);
 
+-- สมาชิกสามารถแก้ไขข้อเสนอแนะของตนเองได้
+DROP POLICY IF EXISTS "Users can update own feedback" ON public.community_feedback;
+CREATE POLICY "Users can update own feedback" ON public.community_feedback
+  FOR UPDATE TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id AND message IS NOT NULL AND length(message) >= 3);
+
+-- สมาชิกสามารถลบข้อเสนอแนะของตนเองได้
+DROP POLICY IF EXISTS "Users can delete own feedback" ON public.community_feedback;
+CREATE POLICY "Users can delete own feedback" ON public.community_feedback
+  FOR DELETE TO authenticated
+  USING (auth.uid() = user_id);
+
 -- ============================================================
 -- RPC Functions สำหรับ Dynamic Community Dashboard (Security Definer)
 -- ============================================================
