@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // AI Prompt ครูไทย — Configuration
 // ============================================================
 // SETUP INSTRUCTIONS:
@@ -48,8 +48,30 @@ const ACCESS_CONFIG = {
 // Site configuration
 const SITE_CONFIG = {
   name: 'AI Prompt ครูไทย',
-  version: '1.1.0',
+  version: '1.3.0',
   promptsPerPage: 24,
   maxSearchSuggestions: 8,
   gaId: '',  // Google Analytics 4 ID เช่น 'G-XXXXXXXXXX'
 };
+
+// ============================================================
+// CHATBOT CONFIG — น้องครูพร้อม (AI Assistant)
+// ============================================================
+const CHATBOT_CONFIG = {
+  enabled: true,
+  botName: 'น้องครูพร้อม',
+  botSubtitle: 'ผู้ช่วย AI คลัง Prompt ครูไทย',
+  avatarEmoji: '🤖',
+  // สามารถใช้ 'gemini-3.5-flash', 'gemini-3.8-flash', หรือ 'gemini-2.5-flash'
+  model: 'gemini-3.5-flash',
+  // ใส่ Google AI Studio API Key (หากเว้นว่างไว้ ระบบจะใช้ Local Smart Assistant อัตโนมัติ หรือให้ผู้ใช้ใส่ Key ส่วนตัวได้)
+  apiKey: '',
+  quickPrompts: [
+    '💡 ออกแบบแผนการสอน Active Learning',
+    '📝 ขอตัวอย่างข้อสอบคิดวิเคราะห์ (HOTS)',
+    '📋 ช่วยร่างข้อตกลง วPA ด้านที่ 1',
+    '🔬 แนะนำ Prompt ทำวิจัยในชั้นเรียน (CAR)',
+    '✨ ขอ Prompt Master Context ตั้งต้น'
+  ]
+};
+
