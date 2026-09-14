@@ -2890,18 +2890,30 @@ body.dark-mode .gate-subnote {
 /* Messages Container */
 .chatbot-messages {
   flex: 1;
-  padding: 16px;
+  padding: 14px 12px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 12px;
   background: var(--bg, #F8FAFC);
+  scrollbar-width: thin;
+}
+
+.chatbot-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chatbot-messages::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
 }
 
 .chat-msg-row {
   display: flex;
-  gap: 8px;
-  max-width: 88%;
+  gap: 6px;
+  max-width: 96%;
+  box-sizing: border-box;
 }
 
 .bot-row {
@@ -2959,6 +2971,19 @@ body.dark-mode .gate-subnote {
   flex-direction: column;
   gap: 8px;
   margin-top: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.msg-prompt-card {
+  background: var(--bg, #F8FAFC);
+  border: 1px solid var(--border, #E2E8F0);
+  border-left: 4px solid var(--primary, #4F46E5);
+  border-radius: 8px;
+  padding: 8px 10px;
+  transition: transform 0.15s ease;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .msg-prompt-card {
