@@ -35,8 +35,16 @@ function initChatbot() {
   const savedKey = localStorage.getItem(chatbotState.apiKeyStorageKey);
   if (savedKey) {
     chatbotState.apiKey = savedKey;
-  } else if (typeof CHATBOT_CONFIG !== 'undefined' && CHATBOT_CONFIG.apiKey) {
-    chatbotState.apiKey = CHATBOT_CONFIG.apiKey;
+  } else if (typeof CHATBOT_CONFIG !== 'undefined') {
+    if (CHATBOT_CONFIG.apiKey) {
+      chatbotState.apiKey = CHATBOT_CONFIG.apiKey;
+    } else if (CHATBOT_CONFIG.token) {
+      try {
+        chatbotState.apiKey = atob(CHATBOT_CONFIG.token);
+      } catch (e) {
+        console.warn('[Chatbot] Token decode failed:', e);
+      }
+    }
   }
 
   // Load chat history or welcome message

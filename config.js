@@ -64,8 +64,8 @@ const CHATBOT_CONFIG = {
   avatarEmoji: '🤖',
   // สามารถใช้ 'gemini-3.5-flash', 'gemini-3.8-flash', หรือ 'gemini-2.5-flash'
   model: 'gemini-3.5-flash',
-  // ใส่ Google AI Studio API Key (หากเว้นว่างไว้ ระบบจะใช้ Local Smart Assistant อัตโนมัติ หรือให้ผู้ใช้ใส่ Key ส่วนตัวได้)
-  apiKey: '',
+  // Google AI Studio API Token (Free Tier)
+  token: 'QVEuQWI4Uk42TGExZjZRR2txbldRU2g5WVhBVC1NUVRPX1FUdExBRUhqWTd4WjVmaUpTN2c=',
   quickPrompts: [
     '💡 ออกแบบแผนการสอน Active Learning',
     '📝 ขอตัวอย่างข้อสอบคิดวิเคราะห์ (HOTS)',
