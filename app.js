@@ -1567,6 +1567,24 @@ async function loadCommunityDashboard(forceRefresh = false) {
   let bookStats = [0, 0, 0];
   let dailyStats = { labels: [], data: [] };
 
+  // Setup 7-Day Timeline Slots (past 7 days up to today)
+  const dayNames = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+  const today = new Date();
+  const daySlots = [];
+  const dateCounts = {};
+
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dateNum = String(d.getDate()).padStart(2, '0');
+    const dateKey = `${y}-${m}-${dateNum}`;
+    const label = `${dayNames[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
+    daySlots.push({ dateKey, label });
+    dateCounts[dateKey] = 0;
+  }
+  let dailyStatsLoaded = false;
+
   // 1. Fetch real overview numbers from Supabase
   if (_sb) {
     let rpcWorked = false;
@@ -1686,18 +1704,54 @@ async function loadCommunityDashboard(forceRefresh = false) {
       console.warn('[CommunityDash] get_book_usage_stats rpc exception:', err);
     }
 
-    // 4. Fetch 7-Day Activity via RPC or copy_events
+    // 4. Fetch 7-Day Activity via RPC or direct copy_events table query
     try {
       const { data: dData, error: dErr } = await _sb.rpc('get_daily_usage_stats', { days_back: 7 });
       if (!dErr && Array.isArray(dData) && dData.length > 0) {
-        dailyStats.labels = dData.map(r => {
-          const d = new Date(r.usage_date);
-          return `${d.getDate()}/${d.getMonth() + 1}`;
+        dData.forEach(r => {
+          if (!r.usage_date) return;
+          const ud = new Date(r.usage_date);
+          const y = ud.getFullYear();
+          const m = String(ud.getMonth() + 1).padStart(2, '0');
+          const dStr = String(ud.getDate()).padStart(2, '0');
+          const k = `${y}-${m}-${dStr}`;
+          if (dateCounts[k] !== undefined) {
+            dateCounts[k] = Number(r.copy_count) || 0;
+          }
         });
-        dailyStats.data = dData.map(r => Number(r.copy_count) || 0);
+        dailyStatsLoaded = true;
       }
     } catch (err) {
       console.warn('[CommunityDash] get_daily_usage_stats rpc exception:', err);
+    }
+
+    // Direct table fallback: fetch recent events directly from copy_events table
+    if (!dailyStatsLoaded) {
+      try {
+        const sevenDaysAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7, 0, 0, 0);
+        const { data: recentEvents, error: evErr } = await _sb
+          .from('copy_events')
+          .select('copied_at')
+          .gte('copied_at', sevenDaysAgo.toISOString())
+          .order('copied_at', { ascending: true });
+
+        if (!evErr && Array.isArray(recentEvents)) {
+          recentEvents.forEach(ev => {
+            if (!ev.copied_at) return;
+            const ed = new Date(ev.copied_at);
+            const y = ed.getFullYear();
+            const m = String(ed.getMonth() + 1).padStart(2, '0');
+            const dStr = String(ed.getDate()).padStart(2, '0');
+            const k = `${y}-${m}-${dStr}`;
+            if (dateCounts[k] !== undefined) {
+              dateCounts[k]++;
+            }
+          });
+          dailyStatsLoaded = true;
+        }
+      } catch (err) {
+        console.warn('[CommunityDash] copy_events direct query exception:', err);
+      }
     }
   }
 
@@ -1760,18 +1814,30 @@ async function loadCommunityDashboard(forceRefresh = false) {
     }
   }
 
-  // If dailyStats empty, generate the 7 past days
-  if (dailyStats.labels.length === 0) {
-    const dayNames = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
-    const today = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const label = `${dayNames[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
-      dailyStats.labels.push(label);
-      dailyStats.data.push(i === 0 ? Math.max(localCopiesCount, 1) : 0);
+  // If Supabase was not used or had no events, tally from local history timestamps
+  if (!dailyStatsLoaded) {
+    const localHistory = (state.copyHistory && state.copyHistory.length > 0)
+      ? state.copyHistory
+      : JSON.parse(localStorage.getItem('ai_prompt_kruthai_copy_history') || '[]');
+
+    if (localHistory.length > 0) {
+      localHistory.forEach(item => {
+        if (!item.ts) return;
+        const ld = new Date(item.ts);
+        const y = ld.getFullYear();
+        const m = String(ld.getMonth() + 1).padStart(2, '0');
+        const dStr = String(ld.getDate()).padStart(2, '0');
+        const k = `${y}-${m}-${dStr}`;
+        if (dateCounts[k] !== undefined) {
+          dateCounts[k]++;
+        }
+      });
     }
   }
+
+  // Populate dailyStats from daySlots and actual counts
+  dailyStats.labels = daySlots.map(s => s.label);
+  dailyStats.data = daySlots.map(s => dateCounts[s.dateKey] || 0);
 
 
   // Save to cache
@@ -1983,8 +2049,14 @@ function renderCommunityCharts() {
             ticks: { color: textColor, font: { family: 'Sarabun', size: 11 } }
           },
           y: {
+            beginAtZero: true,
             grid: { color: gridColor },
-            ticks: { color: textColor, font: { family: 'Sarabun' } }
+            ticks: {
+              color: textColor,
+              font: { family: 'Sarabun' },
+              precision: 0,
+              stepSize: 1
+            }
           }
         }
       }

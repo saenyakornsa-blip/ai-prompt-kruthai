@@ -252,10 +252,10 @@ RETURNS TABLE (usage_date date, copy_count bigint)
 LANGUAGE sql
 SECURITY DEFINER
 AS $$
-  SELECT date_trunc('day', copied_at)::date as usage_date, count(*) as copy_count
+  SELECT (copied_at AT TIME ZONE 'Asia/Bangkok')::date as usage_date, count(*) as copy_count
   FROM public.copy_events
   WHERE copied_at >= (NOW() - (days_back || ' days')::interval)
-  GROUP BY usage_date
+  GROUP BY (copied_at AT TIME ZONE 'Asia/Bangkok')::date
   ORDER BY usage_date ASC;
 $$;
 
