@@ -172,7 +172,15 @@ body {
 .suggestion-item:last-child { border-bottom: none; }
 
 /* Header actions */
-.header-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; flex-shrink: 0; }
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 50;
+}
 
 .btn-icon {
   background: none;
@@ -183,8 +191,20 @@ body {
   border-radius: 8px;
   transition: background var(--transition);
   position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .btn-icon:hover { background: var(--primary-light); }
+#theme-toggle {
+  cursor: pointer;
+  pointer-events: auto;
+}
+#theme-toggle * {
+  pointer-events: none;
+}
 .badge {
   position: absolute;
   top: 2px; right: 2px;

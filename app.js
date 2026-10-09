@@ -1770,32 +1770,59 @@ function showToast(message, type = 'success') {
 /* ═══════════════════════════════════════════════════════════════
    17. DARK MODE
 ═══════════════════════════════════════════════════════════════ */
-function toggleTheme() {
-  document.body.classList.toggle('dark-mode');
-  const isDark = document.body.classList.contains('dark-mode');
-  try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch {}
+/* ═══════════════════════════════════════════════════════════════
+   17. DARK MODE & THEME TOGGLE
+═══════════════════════════════════════════════════════════════ */
+let _lastThemeToggleTime = 0;
+
+function applyTheme(isDark) {
+  if (isDark) {
+    document.body.classList.add('dark-mode');
+    document.body.classList.remove('light-mode');
+  } else {
+    document.body.classList.remove('dark-mode');
+    document.body.classList.add('light-mode');
+  }
+  try {
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  } catch {}
+
   const btn = document.getElementById('theme-toggle');
   if (btn) {
     btn.textContent = isDark ? '☀️' : '🌙';
     btn.setAttribute('title', isDark ? 'เปลี่ยนเป็นธีมสว่าง' : 'เปลี่ยนเป็นธีมมืด');
     btn.setAttribute('aria-label', isDark ? 'เปลี่ยนเป็นธีมสว่าง' : 'เปลี่ยนเป็นธีมมืด');
   }
-  if (state.currentView === 'dashboard') {
-    if (typeof renderCommunityCharts === 'function') renderCommunityCharts();
+  if (state.currentView === 'dashboard' && typeof renderCommunityCharts === 'function') {
+    renderCommunityCharts();
   }
+}
+
+function toggleTheme(event) {
+  if (event) {
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+    if (typeof event.stopPropagation === 'function') event.stopPropagation();
+  }
+  const now = Date.now();
+  if (now - _lastThemeToggleTime < 300) {
+    return; // Prevent duplicate execution within 300ms
+  }
+  _lastThemeToggleTime = now;
+
+  const isCurrentDark = document.body.classList.contains('dark-mode');
+  applyTheme(!isCurrentDark);
 }
 window.toggleTheme = toggleTheme;
 
 function loadTheme() {
   try {
     const saved = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (saved === 'dark' || (!saved && prefersDark)) {
-      document.body.classList.add('dark-mode');
-      const btn = document.getElementById('theme-toggle');
-      if (btn) btn.textContent = '☀️';
-    }
-  } catch {}
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDark = saved ? (saved === 'dark') : prefersDark;
+    applyTheme(isDark);
+  } catch {
+    applyTheme(false);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -3201,7 +3228,7 @@ function setupEventListeners() {
   // Theme toggle
   const themeToggle = document.getElementById('theme-toggle');
   if (themeToggle) {
-    themeToggle.addEventListener('click', toggleTheme);
+    themeToggle.onclick = toggleTheme;
   }
 
   // Desktop search
