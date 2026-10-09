@@ -11,9 +11,13 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   subject TEXT,
   grade_level TEXT,
   role TEXT DEFAULT 'teacher',
+  avatar_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   last_seen TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- เพิ่มคอลัมน์ avatar_url ในกรณีที่มีตารางอยู่แล้ว
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 
 -- ตาราง รายการโปรด
 CREATE TABLE IF NOT EXISTS public.favorites (
@@ -87,8 +91,12 @@ CREATE POLICY "Users read own copies" ON public.copy_events
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, display_name)
-  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)));
+  INSERT INTO public.profiles (id, display_name, avatar_url)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'avatar_url', NEW.raw_user_meta_data->>'picture')
+  );
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

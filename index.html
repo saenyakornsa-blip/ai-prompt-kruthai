@@ -13,7 +13,7 @@
   <noscript>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Kanit:wght@600;700;800&display=swap" />
   </noscript>
-  <link rel="stylesheet" href="style.css?v=1.3.3" />
+  <link rel="stylesheet" href="style.css?v=1.3.5" />
 </head>
 <body class="light-mode">
 
@@ -39,27 +39,36 @@
         <span class="guide-icon">💡</span>
         <span class="guide-text">วิธีใช้</span>
       </button>
-      <button class="btn-icon" id="theme-toggle" title="เปลี่ยนธีม" aria-label="Toggle dark mode">🌙</button>
+      <button class="btn-icon" id="theme-toggle" onclick="toggleTheme()" title="เปลี่ยนธีม (โหมดมืด / สว่าง)" aria-label="Toggle dark mode">🌙</button>
       <button class="btn-icon" id="favorites-btn" title="รายการโปรด" onclick="navigateTo('favorites')">
         ⭐ <span class="badge" id="fav-count">0</span>
       </button>
       <div class="user-menu" id="user-menu">
         <button class="btn-login" id="login-btn" onclick="openAuthModal('login')">เข้าสู่ระบบ</button>
         <div class="user-avatar hidden" id="user-avatar-wrap">
-          <button class="avatar-btn" id="avatar-btn" onclick="toggleUserDropdown(event)">
+          <button class="avatar-btn" id="avatar-btn" onclick="toggleUserDropdown(event)" title="เมนูโปรไฟล์ผู้ใช้">
+            <img id="avatar-img" class="avatar-img hidden" alt="รูปโปรไฟล์" referrerpolicy="no-referrer" />
             <span class="avatar-initials" id="avatar-initials">ก</span>
           </button>
           <div class="user-dropdown hidden" id="user-dropdown">
             <div class="dropdown-header">
-              <span id="dropdown-name">ผู้ใช้</span>
-              <span id="dropdown-email" class="text-muted"></span>
+              <div class="dropdown-user-row">
+                <div class="dropdown-avatar-wrap">
+                  <img id="dropdown-avatar-img" class="dropdown-avatar-img hidden" alt="รูปโปรไฟล์" referrerpolicy="no-referrer" />
+                  <span class="dropdown-avatar-initials" id="dropdown-avatar-initials">ก</span>
+                </div>
+                <div class="dropdown-user-info">
+                  <span id="dropdown-name" class="dropdown-user-name">ผู้ใช้</span>
+                  <span id="dropdown-email" class="dropdown-user-email text-muted"></span>
+                </div>
+              </div>
             </div>
             <hr/>
             <button onclick="navigateTo('dashboard')">📊 สถิติของฉัน</button>
             <button onclick="navigateTo('favorites')">⭐ รายการโปรด</button>
             <button onclick="navigateTo('profile')">👤 โปรไฟล์</button>
             <hr/>
-            <button onclick="signOut()" class="danger">ออกจากระบบ</button>
+            <button onclick="signOut()" class="danger">🚪 ออกจากระบบ</button>
           </div>
         </div>
       </div>
@@ -428,10 +437,23 @@
 
     <div id="view-profile" class="view hidden">
       <div class="view-header"><h2>👤 โปรไฟล์ของฉัน</h2></div>
+
+      <div class="profile-card-header">
+        <div class="profile-avatar-large">
+          <img id="profile-large-img" class="profile-large-img hidden" alt="รูปโปรไฟล์" referrerpolicy="no-referrer" />
+          <span id="profile-large-initials" class="profile-large-initials">ก</span>
+        </div>
+        <div class="profile-header-meta">
+          <h3 id="profile-header-name">ผู้ใช้</h3>
+          <p id="profile-header-email" class="text-muted"></p>
+          <span id="profile-header-badge" class="profile-provider-badge">✉️ บัญชีอีเมล</span>
+        </div>
+      </div>
+
       <div class="profile-form" id="profile-form">
         <div class="form-group"><label>ชื่อที่แสดง</label><input type="text" id="profile-name" placeholder="ชื่อ-นามสกุล หรือชื่อเล่น" /></div>
-        <div class="form-group"><label>โรงเรียน</label><input type="text" id="profile-school" placeholder="ชื่อโรงเรียน" /></div>
-        <div class="form-group"><label>วิชาที่สอน</label><input type="text" id="profile-subject" placeholder="เช่น วิทยาศาสตร์, ภาษาไทย" /></div>
+        <div class="form-group"><label>โรงเรียน / หน่วยงาน</label><input type="text" id="profile-school" placeholder="ชื่อโรงเรียน" /></div>
+        <div class="form-group"><label>กลุ่มสาระ / วิชาที่สอน</label><input type="text" id="profile-subject" placeholder="เช่น วิทยาศาสตร์, ภาษาไทย" /></div>
         <div class="form-group">
           <label>ระดับชั้นที่สอน</label>
           <select id="profile-grade">
@@ -442,7 +464,11 @@
             <option>สอนหลายระดับ</option>
           </select>
         </div>
-        <button class="btn-primary" onclick="saveProfile()">บันทึกโปรไฟล์</button>
+        <div class="form-group">
+          <label>URL รูปโพรไฟล์ <span class="text-muted" style="font-weight:normal; font-size:12px;">(เว้นว่างเพื่อดึงรูปจากอีเมล / บัญชี Google อัตโนมัติ)</span></label>
+          <input type="url" id="profile-avatar-url" placeholder="https://example.com/my-photo.jpg" />
+        </div>
+        <button class="btn-primary" onclick="saveProfile()">💾 บันทึกโปรไฟล์</button>
       </div>
     </div>
   </main>
@@ -711,10 +737,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="data/prompts.js?v=1.2.0"></script>
-<script src="config.js?v=1.3.4"></script>
-<script src="access.js?v=1.3.4"></script>
-<script src="app.js?v=1.3.4"></script>
-<script src="chatbot.js?v=1.3.4"></script>
+<script src="config.js?v=1.3.5"></script>
+<script src="access.js?v=1.3.5"></script>
+<script src="app.js?v=1.3.5"></script>
+<script src="chatbot.js?v=1.3.5"></script>
 <script>
   // Fallback direct event handling for guide triggers
   document.addEventListener('click', function(e) {
