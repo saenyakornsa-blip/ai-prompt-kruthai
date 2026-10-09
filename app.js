@@ -2168,9 +2168,11 @@ async function loadCommunityDashboard(forceRefresh = false) {
 
   // If Supabase didn't return members (e.g. before running SQL to read auth.users), use the verified real count
   if (totalMembers === 0) {
-    totalMembers = 23;
+    totalMembers = 29;
   }
-  totalCopies += localCopiesCount;
+  if (totalCopies === 0) {
+    totalCopies = localCopiesCount;
+  }
   totalFavs = Math.max(totalFavs, state.favorites ? state.favorites.size : 0);
 
   // Load Feedback (both from Supabase and LocalStorage)
