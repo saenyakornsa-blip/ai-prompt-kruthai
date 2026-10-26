@@ -3445,3 +3445,25 @@ body.dark-mode .chatbot-input {
     right: 0;
   }
 }
+
+/* QA & Supervision Theme Extension */
+:root {
+  --qa-purple: #7C3AED;
+  --qa-purple-light: #F5F3FF;
+}
+
+body.dark-mode {
+  --qa-purple-light: #2E1065;
+}
+
+.chip.purple {
+  background: var(--qa-purple-light);
+  color: var(--qa-purple);
+  border: 1px solid var(--qa-purple);
+}
+
+.situation-btn.purple.active {
+  border-color: var(--qa-purple);
+  background: var(--qa-purple-light);
+  color: var(--qa-purple);
+}

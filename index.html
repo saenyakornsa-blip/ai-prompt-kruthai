@@ -13,7 +13,7 @@
   <noscript>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Kanit:wght@600;700;800&display=swap" />
   </noscript>
-  <link rel="stylesheet" href="style.css?v=1.3.6" />
+  <link rel="stylesheet" href="style.css?v=1.3.8" />
 </head>
 <body class="light-mode">
 
@@ -116,8 +116,8 @@
       <div class="nav-book" data-book="3">
         <button class="nav-item nav-book-header" onclick="toggleBook(3)">
           <span>📙</span>
-          <span class="nav-book-label">เล่ม 3 — เอกสาร</span>
-          <span class="chip red">115</span>
+          <span class="nav-book-label">เล่ม 3 — เอกสาร &amp; QA</span>
+          <span class="chip red">120</span>
           <span class="chevron">▸</span>
         </button>
         <div class="nav-chapters" id="chapters-3" style="display:none">
@@ -127,6 +127,7 @@
           <button class="nav-chapter" data-book="3" data-chapter="4" onclick="filterByChapter(3,4)">บทที่ 4: วPA <span class="chip">20</span></button>
           <button class="nav-chapter" data-book="3" data-chapter="5" onclick="filterByChapter(3,5)">บทที่ 5: SAR <span class="chip">15</span></button>
           <button class="nav-chapter" data-book="3" data-chapter="6" onclick="filterByChapter(3,6)">บทที่ 6: Portfolio &amp; PLC <span class="chip">15</span></button>
+          <button class="nav-chapter" data-book="3" data-chapter="7" onclick="filterByChapter(3,7)">บทที่ 7: ประกันคุณภาพ &amp; นิเทศ (QA) <span class="chip purple">5</span></button>
         </div>
       </div>
       <hr class="sidebar-divider" />
@@ -164,6 +165,7 @@
           <button class="situation-btn green" onclick="filterBySituation('สอน')">📗 งานสอน</button>
           <button class="situation-btn blue" onclick="filterBySituation('วัดผล')">📘 วัดผล</button>
           <button class="situation-btn red" onclick="filterBySituation('เอกสาร')">📙 เอกสาร</button>
+          <button class="situation-btn purple" data-situation="ประกันคุณภาพ" onclick="filterBySituation('ประกันคุณภาพ')">🔍 ประกันคุณภาพ & นิเทศ</button>
         </div>
         <div class="tags-bar" id="tags-bar"></div>
       </section>
@@ -736,10 +738,10 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="data/prompts.js?v=1.2.0"></script>
+<script src="data/prompts.js?v=1.3.0"></script>
 <script src="config.js?v=1.3.7"></script>
 <script src="access.js?v=1.3.7"></script>
-<script src="app.js?v=1.3.7"></script>
+<script src="app.js?v=1.3.8"></script>
 <script src="chatbot.js?v=1.3.7"></script>
 <script>
   // Fallback direct event handling for guide triggers
